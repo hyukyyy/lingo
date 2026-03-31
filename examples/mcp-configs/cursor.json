@@ -1,0 +1,28 @@
+{
+  "$comment": [
+    "Cursor MCP server configuration for Lingo.",
+    "",
+    "Installation:",
+    "  Save this as .cursor/mcp.json in your project root,",
+    "  or merge the 'mcpServers' key into your existing .cursor/mcp.json.",
+    "",
+    "Alternative: Use Cursor Settings > MCP Servers > Add Server.",
+    "",
+    "Environment variables (all optional):",
+    "  LINGO_GLOSSARY_PATH  Path to glossary JSON file (default: .lingo/glossary.json)",
+    "  LINGO_ORG            Organization name (default: 'default')",
+    "  LINGO_LOG_LEVEL      Log verbosity: debug|info|warn|error (default: 'info')"
+  ],
+  "mcpServers": {
+    "lingo": {
+      "command": "npx",
+      "args": [
+        "@lingo/mcp-server"
+      ],
+      "env": {
+        "LINGO_GLOSSARY_PATH": ".lingo/glossary.json",
+        "LINGO_ORG": "default"
+      }
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "$comment": [
+    "Direct Node.js MCP configuration for Lingo (no npx).",
+    "",
+    "Use this when lingo is installed globally or you want to",
+    "reference the built dist/ output directly.",
+    "",
+    "For global install:  npm install -g @lingo/mcp-server",
+    "Then use:            \"command\": \"lingo\"",
+    "",
+    "For local reference, update the path in 'args' to point to",
+    "your local dist/server.js."
+  ],
+  "mcpServers": {
+    "lingo": {
+      "command": "node",
+      "args": [
+        "node_modules/@lingo/mcp-server/dist/server.js"
+      ],
+      "env": {
+        "LINGO_GLOSSARY_PATH": ".lingo/glossary.json",
+        "LINGO_ORG": "default"
+      }
+    }
+  }
+}

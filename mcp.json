@@ -1,0 +1,80 @@
+{
+  "$schema": "https://raw.githubusercontent.com/modelcontextprotocol/specification/main/schema/mcp.schema.json",
+  "server": {
+    "name": "lingo",
+    "version": "0.1.0",
+    "description": "Organizational context layer for AI development tools — maps planning terminology to code locations, enabling AI tools to understand your organization's unique language and workflows.",
+    "homepage": "https://github.com/dyoon/lingo",
+    "command": "npx",
+    "args": [
+      "@lingo/mcp-server"
+    ],
+    "transport": "stdio",
+    "env": {
+      "LINGO_GLOSSARY_PATH": {
+        "description": "Path to the glossary JSON file (relative to project root or absolute)",
+        "default": ".lingo/glossary.json",
+        "required": false
+      },
+      "LINGO_ORG": {
+        "description": "Organization name for new glossary stores",
+        "default": "default",
+        "required": false
+      },
+      "LINGO_LOG_LEVEL": {
+        "description": "Logging verbosity: debug | info | warn | error",
+        "default": "info",
+        "required": false
+      }
+    }
+  },
+  "capabilities": {
+    "tools": {
+      "query_context": {
+        "description": "Search the organizational glossary for terms matching a natural-language query"
+      },
+      "get_term": {
+        "description": "Retrieve a specific glossary term by ID or name"
+      },
+      "add_term": {
+        "description": "Add a new term to the organizational glossary"
+      },
+      "update_term": {
+        "description": "Update an existing glossary term"
+      },
+      "remove_term": {
+        "description": "Remove a term from the glossary"
+      },
+      "list_terms": {
+        "description": "List all terms, optionally filtered or searched"
+      },
+      "find_by_file": {
+        "description": "Find terms associated with a specific file path"
+      },
+      "bootstrap": {
+        "description": "AI-powered cold-start: infer terms from codebase scan and PM tools"
+      },
+      "suggest_code_changes": {
+        "description": "Analyze term change impact and generate code modification suggestions"
+      },
+      "create_from_text": {
+        "description": "Reverse-flow: parse natural language text into structured PM items, optionally route through adapter"
+      }
+    },
+    "resources": {
+      "lingo://terms": {
+        "description": "Browse all organizational glossary terms"
+      },
+      "lingo://terms/{termId}": {
+        "description": "Retrieve a specific glossary term by ID"
+      },
+      "lingo://categories": {
+        "description": "Browse all glossary term categories"
+      },
+      "lingo://status": {
+        "description": "Glossary store status and statistics"
+      }
+    }
+  },
+  "instructions": "Lingo is an organizational context layer that maps planning terminology to code locations. Use the available tools to search, browse, and manage your organization's glossary of terms. Each term connects a planning/product concept (e.g., 'Sprint Velocity') to specific code locations. Start with 'bootstrap' for AI-powered cold-start discovery, or use 'add_term' to manually build your glossary."
+}

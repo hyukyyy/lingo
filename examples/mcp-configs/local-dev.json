@@ -1,0 +1,25 @@
+{
+  "$comment": [
+    "Local development MCP configuration for Lingo.",
+    "",
+    "Use this when developing the lingo server itself.",
+    "Points to the local source via tsx for hot-reload.",
+    "",
+    "Save as .mcp.json in the lingo project root, or merge into",
+    "your global Claude Code / Cursor MCP configuration."
+  ],
+  "mcpServers": {
+    "lingo": {
+      "command": "npx",
+      "args": [
+        "tsx",
+        "src/server.ts"
+      ],
+      "env": {
+        "LINGO_GLOSSARY_PATH": ".lingo/glossary.json",
+        "LINGO_ORG": "dev",
+        "LINGO_LOG_LEVEL": "debug"
+      }
+    }
+  }
+}

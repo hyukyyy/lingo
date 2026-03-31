@@ -1,0 +1,28 @@
+{
+  "$comment": [
+    "Claude Desktop MCP server configuration for Lingo.",
+    "",
+    "Installation:",
+    "  Merge the 'mcpServers' key into your Claude Desktop config file:",
+    "    macOS: ~/Library/Application Support/Claude/claude_desktop_config.json",
+    "    Windows: %APPDATA%\\Claude\\claude_desktop_config.json",
+    "    Linux: ~/.config/Claude/claude_desktop_config.json",
+    "",
+    "Environment variables (all optional):",
+    "  LINGO_GLOSSARY_PATH  Path to glossary JSON file (default: .lingo/glossary.json)",
+    "  LINGO_ORG            Organization name (default: 'default')",
+    "  LINGO_LOG_LEVEL      Log verbosity: debug|info|warn|error (default: 'info')"
+  ],
+  "mcpServers": {
+    "lingo": {
+      "command": "npx",
+      "args": [
+        "@lingo/mcp-server"
+      ],
+      "env": {
+        "LINGO_GLOSSARY_PATH": ".lingo/glossary.json",
+        "LINGO_ORG": "default"
+      }
+    }
+  }
+}
