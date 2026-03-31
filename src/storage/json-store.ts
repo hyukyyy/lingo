@@ -17,6 +17,9 @@ import { dirname, resolve } from "node:path";
 import {
   type GlossaryStore,
   type GlossaryTerm,
+  type SignalType,
+  type CouplingSource,
+  SIGNAL_SCORES,
   GLOSSARY_SCHEMA_VERSION,
   createEmptyStore,
   createTerm,
@@ -326,6 +329,66 @@ export class JsonGlossaryStorage {
         loc.filePath.toLowerCase().includes(normalized)
       )
     );
+  }
+
+  /**
+   * Records a coupling signal for a term, increasing its coupling score.
+   *
+   * Each signal type adds a fixed increment (see SIGNAL_SCORES). Scores cap at 1.0.
+   * A time-decay factor is applied if the term hasn't been seen in 6+ months:
+   * the existing score is halved before the new signal is added.
+   *
+   * @param termId    - The ID of the term to update
+   * @param signalType - The type of signal being recorded
+   * @returns The updated term, or undefined if the term was not found
+   */
+  async recordSignal(
+    termId: string,
+    signalType: SignalType
+  ): Promise<GlossaryTerm | undefined> {
+    const store = this.getStore();
+    const term = store.terms[termId];
+    if (!term) {
+      return undefined;
+    }
+
+    const now = new Date();
+    const todayIso = now.toISOString().slice(0, 10); // "YYYY-MM-DD"
+    const increment = SIGNAL_SCORES[signalType];
+
+    // Initialize coupling if this is the first signal
+    if (!term.coupling) {
+      term.coupling = {
+        score: 0,
+        signals: 0,
+        sources: [],
+        lastSeen: todayIso,
+      };
+    }
+
+    // Apply time decay: if lastSeen > 6 months ago, halve the score
+    const lastSeenDate = new Date(term.coupling.lastSeen);
+    const sixMonthsMs = 6 * 30 * 24 * 60 * 60 * 1000;
+    if (now.getTime() - lastSeenDate.getTime() > sixMonthsMs) {
+      term.coupling.score = term.coupling.score * 0.5;
+    }
+
+    // Add signal increment (capped at 1.0)
+    term.coupling.score = Math.min(1.0, term.coupling.score + increment);
+    term.coupling.signals += 1;
+    term.coupling.lastSeen = todayIso;
+
+    // Update per-source count
+    const existing = term.coupling.sources.find((s) => s.type === signalType);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      term.coupling.sources.push({ type: signalType, count: 1 } as CouplingSource);
+    }
+
+    term.updatedAt = now.toISOString();
+    await this.save();
+    return term;
   }
 }
 

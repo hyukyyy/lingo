@@ -59,6 +59,12 @@
       },
       "create_from_text": {
         "description": "Reverse-flow: parse natural language text into structured PM items, optionally route through adapter"
+      },
+      "learn_from_pr": {
+        "description": "Learn organizational terminology from a GitHub Pull Request — extracts terms from PR title/description and maps to changed files"
+      },
+      "record_signal": {
+        "description": "Record a coupling signal for a glossary term to strengthen its term↔code mapping score"
       }
     },
     "resources": {

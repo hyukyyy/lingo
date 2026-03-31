@@ -1,0 +1,11 @@
+{
+  "name": "lingo",
+  "version": "0.1.0",
+  "description": "Organizational context layer — maps planning terminology to code locations for AI tools",
+  "author": {
+    "name": "hyukyyy"
+  },
+  "license": "MIT",
+  "skills": "../skills/",
+  "mcpServers": "./.mcp.json"
+}

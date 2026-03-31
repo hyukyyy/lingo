@@ -83,8 +83,8 @@ describe("Lingo MCP Server", () => {
       // The internal Server instance is accessible via server.server.
       expect(server).toBeDefined();
 
-      // ALL_TOOL_NAMES should contain exactly 10 tools
-      expect(ALL_TOOL_NAMES).toHaveLength(10);
+      // ALL_TOOL_NAMES should contain exactly 11 tools
+      expect(ALL_TOOL_NAMES).toHaveLength(12);
       expect(ALL_TOOL_NAMES).toContain("query_context");
       expect(ALL_TOOL_NAMES).toContain("get_term");
       expect(ALL_TOOL_NAMES).toContain("add_term");

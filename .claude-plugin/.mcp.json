@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "lingo": {
+      "command": "node",
+      "args": ["dist/server.js"],
+      "cwd": "/home/dyoon/codes/dyoon/lingo",
+      "env": {
+        "LINGO_GLOSSARY_PATH": ".lingo/glossary.json",
+        "LINGO_ORG": "default"
+      }
+    }
+  }
+}

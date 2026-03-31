@@ -26,6 +26,7 @@ import type {
   CodeRelationship,
   ConfidenceLevel,
   CodeLocation,
+  SignalType,
 } from "../models/glossary.js";
 import { BootstrapOrchestrator } from "../bootstrap/index.js";
 import type { AdapterRegistry } from "../adapters/registry.js";
@@ -40,6 +41,7 @@ import { parseNaturalLanguage } from "../nl-parser/nl-parser.js";
 import { createPmItem } from "../models/pm-items.js";
 import type { NlParserOptions } from "../nl-parser/types.js";
 import type { PmItemType, PmStatus, PmPriority, PmItem, CreatePmItemInput } from "../models/pm-items.js";
+import { learnFromPR } from "../pr-learner/index.js";
 
 // ─── Tool Names (exported for testing) ─────────────────────────────────
 
@@ -54,6 +56,8 @@ export const TOOL_NAMES = {
   BOOTSTRAP: "bootstrap",
   SUGGEST_CODE_CHANGES: "suggest_code_changes",
   CREATE_FROM_TEXT: "create_from_text",
+  LEARN_FROM_PR: "learn_from_pr",
+  RECORD_SIGNAL: "record_signal",
 } as const;
 
 /**
@@ -137,6 +141,7 @@ function formatTermForOutput(term: GlossaryTerm) {
     tags: term.tags,
     source: term.source,
     confidence: term.confidence,
+    coupling: term.coupling ?? null,
     createdAt: term.createdAt,
     updatedAt: term.updatedAt,
   };
@@ -229,6 +234,11 @@ export function registerTools(
             (term) => term.category === args.category
           );
         }
+
+        // Sort by coupling score descending — stronger mappings surface first
+        results.sort(
+          (a, b) => (b.coupling?.score ?? 0) - (a.coupling?.score ?? 0)
+        );
 
         // Apply result limit
         results = results.slice(0, limit);
@@ -1298,6 +1308,156 @@ export function registerTools(
             {
               type: "text" as const,
               text: JSON.stringify(response, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify({
+                success: false,
+                error: (error as Error).message,
+              }),
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // ─── learn_from_pr ─────────────────────────────────────────────────
+
+  server.tool(
+    TOOL_NAMES.LEARN_FROM_PR,
+    "Learn organizational terminology from a GitHub Pull Request. " +
+      "Extracts planning terms from PR title/description and maps them to changed code files. " +
+      "Use dryRun to preview before persisting.",
+    {
+      prUrl: z
+        .string()
+        .describe("GitHub PR URL (e.g., https://github.com/owner/repo/pull/123)"),
+      githubToken: z
+        .string()
+        .optional()
+        .describe("GitHub Personal Access Token (falls back to LINGO_GITHUB_TOKEN env var)"),
+      dryRun: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe("Preview extracted terms without saving to glossary"),
+    },
+    async (args) => {
+      try {
+        const result = await learnFromPR(storage, {
+          prUrl: args.prUrl,
+          githubToken: args.githubToken,
+          dryRun: args.dryRun,
+        });
+
+        const response = {
+          success: true,
+          dryRun: args.dryRun,
+          summary: {
+            termsCreated: result.termsCreated,
+            termsUpdated: result.termsUpdated,
+            codeLocationsAdded: result.codeLocationsAdded,
+          },
+          terms: result.terms.map((t) => ({
+            name: t.name,
+            definition: t.definition,
+            action: t.action,
+            codeLocations: t.codeLocations.map((cl) => ({
+              filePath: cl.filePath,
+              relationship: cl.relationship,
+            })),
+            source: t.source,
+          })),
+        };
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(response, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify({
+                success: false,
+                error: (error as Error).message,
+              }),
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // ── record_signal ──────────────────────────────────────────────────
+  server.tool(
+    TOOL_NAMES.RECORD_SIGNAL,
+    "Record a coupling signal for a glossary term, strengthening the mapping between " +
+      "the term and its code locations. Each signal type adds a fixed score increment " +
+      "(prompt: +0.15, manual: +0.20, pr: +0.10, docs: +0.08, bootstrap: +0.05). " +
+      "Scores cap at 1.0. Terms inactive for 6+ months receive a decay factor before " +
+      "the new signal is applied. Use this from Claude Code hooks or other automation " +
+      "to record when a term appears in an accepted prompt or commit.",
+    {
+      termId: z.string().describe(
+        "The unique ID of the glossary term to signal"
+      ),
+      signalType: z
+        .enum(["pr", "prompt", "docs", "manual", "bootstrap"])
+        .describe(
+          "The type of signal: 'prompt' (accepted AI suggestion), 'pr' (merged PR), " +
+          "'docs' (found in planning doc), 'manual' (explicitly added), 'bootstrap' (cold-start scan)"
+        ),
+    },
+    async (args) => {
+      try {
+        const updated = await storage.recordSignal(
+          args.termId,
+          args.signalType as SignalType
+        );
+
+        if (!updated) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: JSON.stringify({
+                  success: false,
+                  error: `Term not found: ${args.termId}`,
+                }),
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(
+                {
+                  success: true,
+                  message: `Signal '${args.signalType}' recorded for term '${updated.name}'`,
+                  coupling: updated.coupling,
+                  termId: updated.id,
+                },
+                null,
+                2
+              ),
             },
           ],
         };

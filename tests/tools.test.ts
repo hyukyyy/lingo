@@ -92,9 +92,9 @@ describe("Lingo MCP Tools", () => {
       }
     });
 
-    it("registers exactly 10 tools", async () => {
+    it("registers exactly 12 tools", async () => {
       const result = await client.listTools();
-      expect(result.tools).toHaveLength(10);
+      expect(result.tools).toHaveLength(12);
     });
 
     it("each tool has a non-empty description", async () => {

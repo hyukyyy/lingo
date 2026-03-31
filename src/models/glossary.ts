@@ -54,6 +54,47 @@ export type CodeRelationship =
 export type ConfidenceLevel = "manual" | "ai-suggested" | "ai-verified";
 
 /**
+ * Source types that contribute coupling signals.
+ * - "pr": Learned from a merged pull request
+ * - "prompt": User prompt → code accept/commit cycle (via Claude Code hook)
+ * - "docs": Found in local planning documents (.md/.txt)
+ * - "manual": Manually added by a human
+ * - "bootstrap": Discovered during cold-start codebase scan
+ */
+export type SignalType = "pr" | "prompt" | "docs" | "manual" | "bootstrap";
+
+/** Score increment per signal type */
+export const SIGNAL_SCORES: Record<SignalType, number> = {
+  pr: 0.10,
+  prompt: 0.15,
+  docs: 0.08,
+  manual: 0.20,
+  bootstrap: 0.05,
+};
+
+/** A single signal source and its accumulated count */
+export interface CouplingSource {
+  type: SignalType;
+  count: number;
+}
+
+/**
+ * Coupling strength between a term and its code locations.
+ * Accumulated from multiple signal sources over time.
+ * Score range: 0.0 (no evidence) to 1.0 (maximum confidence).
+ */
+export interface CouplingStrength {
+  /** Normalized coupling score (0.0–1.0), used for search result sorting */
+  score: number;
+  /** Total number of accumulated signals */
+  signals: number;
+  /** Per-source signal counts */
+  sources: CouplingSource[];
+  /** ISO 8601 date of the last recorded signal */
+  lastSeen: string;
+}
+
+/**
  * The source/origin of a glossary term — where it was discovered or defined.
  */
 export interface TermSource {
@@ -101,6 +142,9 @@ export interface GlossaryTerm {
 
   /** How confident we are in the term-to-code mapping */
   confidence: ConfidenceLevel;
+
+  /** Accumulated coupling strength between this term and its code locations */
+  coupling?: CouplingStrength;
 
   /** ISO 8601 timestamp of when this term was created */
   createdAt: string;
