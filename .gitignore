@@ -3,3 +3,4 @@ dist/
 *.tsbuildinfo
 docs/
 .lingo/config.json
+tests/**/.tmp-test-data/

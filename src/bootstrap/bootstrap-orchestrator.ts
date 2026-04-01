@@ -405,11 +405,14 @@ export class BootstrapOrchestrator {
         class: 0,
         interface: 1,
         enum: 2,
-        module: 3,
-        namespace: 4,
-        directory: 5,
-        function: 6,
-        constant: 7,
+        term: 3,
+        definition: 4,
+        section: 5,
+        module: 6,
+        namespace: 7,
+        directory: 8,
+        function: 9,
+        constant: 10,
       };
       return (kindOrder[a.kind] ?? 99) - (kindOrder[b.kind] ?? 99);
     });
@@ -484,6 +487,23 @@ export class BootstrapOrchestrator {
     // Include namespaces
     if (concept.kind === "namespace") {
       return true;
+    }
+
+    // Doc-sourced: bold terms and table definitions are always term-worthy
+    if (concept.kind === "term" || concept.kind === "definition") {
+      return true;
+    }
+
+    // Doc-sourced: section headers are term-worthy unless generic
+    if (concept.kind === "section") {
+      const name = concept.name.toLowerCase();
+      const genericSections = [
+        "introduction", "overview", "summary", "table of contents",
+        "getting started", "prerequisites", "installation", "usage",
+        "contributing", "license", "changelog", "faq", "appendix",
+        "references", "acknowledgements", "conclusion",
+      ];
+      return !genericSections.includes(name);
     }
 
     return false;

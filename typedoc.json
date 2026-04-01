@@ -1,0 +1,15 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["src/index.ts"],
+  "out": "docs",
+  "name": "@hyukyyy/lingo-mcp-server",
+  "readme": "README.md",
+  "tsconfig": "tsconfig.json",
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "includeVersion": true,
+  "navigationLinks": {
+    "GitHub": "https://github.com/hyukyyy/lingo",
+    "npm": "https://www.npmjs.com/package/@hyukyyy/lingo-mcp-server"
+  }
+}

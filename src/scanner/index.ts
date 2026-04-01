@@ -135,12 +135,16 @@ export class CodebaseScanner {
       constant: 0,
       directory: 0,
       namespace: 0,
+      section: 0,
+      term: 0,
+      definition: 0,
     };
 
     const conceptsByLanguage: Record<SupportedLanguage, number> = {
       typescript: 0,
       javascript: 0,
       python: 0,
+      markdown: 0,
       unknown: 0,
     };
 

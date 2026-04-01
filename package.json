@@ -1,10 +1,20 @@
 {
-  "name": "@lingo/mcp-server",
-  "version": "0.1.0",
+  "name": "@hyukyyy/lingo-mcp-server",
+  "version": "0.1.1",
   "description": "MCP server providing an organizational context layer — maps planning terminology to code locations for AI development tools",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist/",
+    "hooks/",
+    "skills/",
+    "examples/",
+    "mcp.json",
+    "README.md",
+    ".claude-plugin/",
+    "CHANGELOG.md"
+  ],
   "bin": {
     "lingo": "dist/server.js"
   },
@@ -16,7 +26,9 @@
     "lint": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "docs": "typedoc",
+    "prepublishOnly": "npm run build && npm run test"
   },
   "keywords": [
     "mcp",
@@ -27,6 +39,14 @@
     "terminology-mapping"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hyukyyy/lingo.git"
+  },
+  "homepage": "https://github.com/hyukyyy/lingo#readme",
+  "bugs": {
+    "url": "https://github.com/hyukyyy/lingo/issues"
+  },
   "engines": {
     "node": ">=18.0.0"
   },
@@ -37,6 +57,7 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "tsx": "^4.19.0",
+    "typedoc": "^0.28.18",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"
   }

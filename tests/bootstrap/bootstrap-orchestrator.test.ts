@@ -31,9 +31,10 @@ function makeScanResult(concepts: CodeConcept[]): ScanResult {
       conceptsByKind: {
         module: 0, class: 0, function: 0, interface: 0,
         enum: 0, constant: 0, directory: 0, namespace: 0,
+        section: 0, term: 0, definition: 0,
       },
       conceptsByLanguage: {
-        typescript: concepts.length, javascript: 0, python: 0, unknown: 0,
+        typescript: concepts.length, javascript: 0, python: 0, markdown: 0, unknown: 0,
       },
       durationMs: 42,
     },

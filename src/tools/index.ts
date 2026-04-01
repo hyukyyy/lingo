@@ -16,6 +16,7 @@
  *   - bootstrap:             AI-powered cold-start: infer terms from codebase scan
  *   - suggest_code_changes:  Analyze term change impact and generate code modification suggestions
  *   - create_from_text:      Reverse-flow: parse NL text into PM items, optionally route through adapter
+ *   - list_adapters:         List all available PM and SCM adapters with { name, type, displayName }
  */
 
 import { z } from "zod";
@@ -30,6 +31,7 @@ import type {
 } from "../models/glossary.js";
 import { BootstrapOrchestrator } from "../bootstrap/index.js";
 import type { AdapterRegistry } from "../adapters/registry.js";
+import type { SCMAdapterRegistry } from "../adapters/scm/registry.js";
 import { analyzeImpact } from "../analysis/impact-analysis.js";
 import {
   generateSuggestions,
@@ -58,6 +60,7 @@ export const TOOL_NAMES = {
   CREATE_FROM_TEXT: "create_from_text",
   LEARN_FROM_PR: "learn_from_pr",
   RECORD_SIGNAL: "record_signal",
+  LIST_ADAPTERS: "list_adapters",
 } as const;
 
 /**
@@ -177,14 +180,52 @@ function applyFilters(
   });
 }
 
+// ─── SCM Adapter Resolution ─────────────────────────────────────────────
+
+/**
+ * Hostname-to-adapter-name mapping for SCM URL resolution.
+ * Maps well-known SCM hostnames to their adapter identifiers.
+ *
+ * This enables the learn_from_pr tool to automatically select the correct
+ * SCM adapter based on the PR URL, without requiring the caller to specify
+ * the adapter explicitly.
+ */
+const SCM_HOST_MAP: Record<string, string> = {
+  "github.com": "github",
+  "gitlab.com": "gitlab",
+  "bitbucket.org": "bitbucket",
+};
+
+/**
+ * Resolves an SCM adapter name from a pull request / merge request URL.
+ *
+ * Extracts the hostname from the URL and maps it to a known adapter name.
+ * Returns undefined if the URL cannot be parsed or the hostname is not
+ * recognized.
+ *
+ * @param url - The PR/MR URL (e.g., "https://github.com/owner/repo/pull/123")
+ * @returns The adapter name (e.g., "github"), or undefined if not recognized
+ */
+export function resolveScmAdapterName(url: string): string | undefined {
+  try {
+    const hostname = new URL(url).hostname;
+    return SCM_HOST_MAP[hostname];
+  } catch {
+    // URL parsing failed — caller will fall back to default behavior
+    return undefined;
+  }
+}
+
 // ─── Registration ──────────────────────────────────────────────────────
 
 /**
  * Options for tool registration.
  */
 export interface RegisterToolsOptions {
-  /** Optional adapter registry for the bootstrap tool */
+  /** Optional PM adapter registry for the bootstrap tool */
   adapterRegistry?: AdapterRegistry;
+  /** Optional SCM adapter registry for learn_from_pr and list_adapters tools */
+  scmAdapterRegistry?: SCMAdapterRegistry;
 }
 
 /**
@@ -1351,10 +1392,22 @@ export function registerTools(
     },
     async (args) => {
       try {
+        // Resolve SCM adapter from registry when available.
+        // Maps URL hostname to adapter name (e.g., "github.com" → "github").
+        // Falls back to direct GitHub API calls if no adapter is found.
+        let scmAdapter: import("../adapters/scm/types.js").SCMAdapter | undefined;
+        if (options?.scmAdapterRegistry) {
+          const adapterName = resolveScmAdapterName(args.prUrl);
+          if (adapterName) {
+            scmAdapter = options.scmAdapterRegistry.get(adapterName);
+          }
+        }
+
         const result = await learnFromPR(storage, {
           prUrl: args.prUrl,
           githubToken: args.githubToken,
           dryRun: args.dryRun,
+          scmAdapter,
         });
 
         const response = {
@@ -1454,6 +1507,72 @@ export function registerTools(
                   message: `Signal '${args.signalType}' recorded for term '${updated.name}'`,
                   coupling: updated.coupling,
                   termId: updated.id,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify({
+                success: false,
+                error: (error as Error).message,
+              }),
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // ── list_adapters ──────────────────────────────────────────────────
+  server.tool(
+    TOOL_NAMES.LIST_ADAPTERS,
+    "List all available PM (Project Management) and SCM (Source Control Management) adapters. " +
+      "Returns a unified list of adapters known to both registries, each with { name, type, displayName }. " +
+      "Use this to discover which integrations are available before calling bootstrap, create_from_text, or learn_from_pr.",
+    {},
+    async () => {
+      try {
+        const adapters: Array<{ name: string; type: string; displayName: string }> = [];
+
+        // Collect PM adapters from the PM adapter registry
+        if (options?.adapterRegistry) {
+          for (const info of options.adapterRegistry.availableAdapters) {
+            adapters.push({
+              name: info.name,
+              type: "pm",
+              displayName: info.displayName,
+            });
+          }
+        }
+
+        // Collect SCM adapters from the SCM adapter registry
+        if (options?.scmAdapterRegistry) {
+          for (const info of options.scmAdapterRegistry.availableAdapters) {
+            adapters.push({
+              name: info.name,
+              type: "scm",
+              displayName: info.displayName,
+            });
+          }
+        }
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(
+                {
+                  success: true,
+                  count: adapters.length,
+                  adapters,
                 },
                 null,
                 2

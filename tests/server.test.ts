@@ -2,6 +2,9 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { createServer, loadConfig, Logger, type LingoServerConfig } from "../src/server.js";
 import { JsonGlossaryStorage } from "../src/storage/json-store.js";
 import { ALL_TOOL_NAMES, TOOL_NAMES } from "../src/tools/index.js";
+import * as registerToolsModule from "../src/tools/index.js";
+import { SCMAdapterRegistry } from "../src/adapters/scm/registry.js";
+import { AdapterRegistry } from "../src/adapters/registry.js";
 
 describe("Lingo MCP Server", () => {
   afterEach(() => {
@@ -83,8 +86,8 @@ describe("Lingo MCP Server", () => {
       // The internal Server instance is accessible via server.server.
       expect(server).toBeDefined();
 
-      // ALL_TOOL_NAMES should contain exactly 11 tools
-      expect(ALL_TOOL_NAMES).toHaveLength(12);
+      // ALL_TOOL_NAMES should contain exactly 13 tools
+      expect(ALL_TOOL_NAMES).toHaveLength(13);
       expect(ALL_TOOL_NAMES).toContain("query_context");
       expect(ALL_TOOL_NAMES).toContain("get_term");
       expect(ALL_TOOL_NAMES).toContain("add_term");
@@ -95,6 +98,7 @@ describe("Lingo MCP Server", () => {
       expect(ALL_TOOL_NAMES).toContain("bootstrap");
       expect(ALL_TOOL_NAMES).toContain("suggest_code_changes");
       expect(ALL_TOOL_NAMES).toContain("create_from_text");
+      expect(ALL_TOOL_NAMES).toContain("list_adapters");
     });
 
     it("TOOL_NAMES constant has all expected keys", () => {
@@ -107,11 +111,74 @@ describe("Lingo MCP Server", () => {
       expect(TOOL_NAMES.FIND_BY_FILE).toBe("find_by_file");
       expect(TOOL_NAMES.BOOTSTRAP).toBe("bootstrap");
       expect(TOOL_NAMES.CREATE_FROM_TEXT).toBe("create_from_text");
+      expect(TOOL_NAMES.LIST_ADAPTERS).toBe("list_adapters");
     });
 
     it("creates server without errors when tools are registered", () => {
       // If registerTools() threw during createServer(), this would fail
       expect(() => createServer(testConfig)).not.toThrow();
+    });
+  });
+
+  describe("adapter registry wiring", () => {
+    const testConfig: LingoServerConfig = {
+      glossaryPath: ".lingo/glossary.json",
+      organization: "test-org",
+      logLevel: "info",
+    };
+
+    it("passes SCMAdapterRegistry to registerTools", () => {
+      const registerToolsSpy = vi.spyOn(registerToolsModule, "registerTools");
+
+      createServer(testConfig);
+
+      expect(registerToolsSpy).toHaveBeenCalledOnce();
+      const callArgs = registerToolsSpy.mock.calls[0];
+      // Third argument is the options object
+      const options = callArgs[2];
+      expect(options).toBeDefined();
+      expect(options!.scmAdapterRegistry).toBeInstanceOf(SCMAdapterRegistry);
+
+      registerToolsSpy.mockRestore();
+    });
+
+    it("passes AdapterRegistry (PM) to registerTools", () => {
+      const registerToolsSpy = vi.spyOn(registerToolsModule, "registerTools");
+
+      createServer(testConfig);
+
+      const options = registerToolsSpy.mock.calls[0][2];
+      expect(options).toBeDefined();
+      expect(options!.adapterRegistry).toBeInstanceOf(AdapterRegistry);
+
+      registerToolsSpy.mockRestore();
+    });
+
+    it("registers builtin SCM adapters (GitHub) in the SCM registry", () => {
+      const registerToolsSpy = vi.spyOn(registerToolsModule, "registerTools");
+
+      createServer(testConfig);
+
+      const options = registerToolsSpy.mock.calls[0][2];
+      const scmRegistry = options!.scmAdapterRegistry!;
+      // GitHub should be registered as a builtin SCM adapter
+      expect(scmRegistry.hasFactory("github")).toBe(true);
+
+      registerToolsSpy.mockRestore();
+    });
+
+    it("registers builtin PM adapters in the PM registry", () => {
+      const registerToolsSpy = vi.spyOn(registerToolsModule, "registerTools");
+
+      createServer(testConfig);
+
+      const options = registerToolsSpy.mock.calls[0][2];
+      const pmRegistry = options!.adapterRegistry!;
+      // Notion and JSON should be registered as builtin PM adapters
+      expect(pmRegistry.hasFactory("notion")).toBe(true);
+      expect(pmRegistry.hasFactory("json")).toBe(true);
+
+      registerToolsSpy.mockRestore();
     });
   });
 

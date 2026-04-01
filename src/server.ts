@@ -28,6 +28,10 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { JsonGlossaryStorage } from "./storage/json-store.js";
 import { registerTools } from "./tools/index.js";
 import { registerResources } from "./resources/index.js";
+import { AdapterRegistry } from "./adapters/registry.js";
+import { registerBuiltinAdapters } from "./adapters/builtin-adapters.js";
+import { SCMAdapterRegistry } from "./adapters/scm/registry.js";
+import { registerBuiltinSCMAdapters } from "./adapters/scm/builtin-scm-adapters.js";
 
 // ─── Constants ───────────────────────────────────────────────────────
 
@@ -150,8 +154,18 @@ export function createServer(
     }
   );
 
-  // Register all tool handlers with storage backend
-  registerTools(server, resolvedStorage);
+  // Create adapter registries and register built-in adapter factories
+  const adapterRegistry = new AdapterRegistry();
+  registerBuiltinAdapters(adapterRegistry);
+
+  const scmAdapterRegistry = new SCMAdapterRegistry();
+  registerBuiltinSCMAdapters(scmAdapterRegistry);
+
+  // Register all tool handlers with storage backend and adapter registries
+  registerTools(server, resolvedStorage, {
+    adapterRegistry,
+    scmAdapterRegistry,
+  });
 
   // Register all resource handlers
   registerResources(server);

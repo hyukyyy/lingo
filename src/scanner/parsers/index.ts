@@ -8,6 +8,7 @@
 import type { LanguageParser } from "../../types/index.js";
 import { TypeScriptParser } from "./typescript-parser.js";
 import { PythonParser } from "./python-parser.js";
+import { DocsParser } from "./docs-parser.js";
 
 /**
  * Registry of all available language parsers.
@@ -20,6 +21,7 @@ export class ParserRegistry {
     // Register built-in parsers
     this.register(new TypeScriptParser());
     this.register(new PythonParser());
+    this.register(new DocsParser());
   }
 
   /**

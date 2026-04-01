@@ -160,6 +160,9 @@ const KIND_BONUS: Record<CodeConceptKind, number> = {
   function:   0.70,
   constant:   0.60,
   directory:  0.50,
+  section:    0.40,
+  term:       0.45,
+  definition: 0.45,
 };
 
 /**
@@ -174,6 +177,9 @@ const KIND_TO_RELATIONSHIP: Record<CodeConceptKind, CodeRelationship> = {
   function:   "implements",
   constant:   "configures",
   directory:  "defines",
+  section:    "defines",
+  term:       "defines",
+  definition: "defines",
 };
 
 /** Bonus for exported concepts (more likely to be public API / primary definition) */

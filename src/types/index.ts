@@ -19,7 +19,10 @@ export type CodeConceptKind =
   | "enum"         // An enum declaration
   | "constant"     // A top-level constant or exported variable
   | "directory"    // A directory in the project structure
-  | "namespace";   // A namespace or package grouping
+  | "namespace"    // A namespace or package grouping
+  | "section"      // A document section heading (from markdown headers)
+  | "term"         // A highlighted term (from bold text in docs)
+  | "definition";  // A structured definition (from table cells in docs)
 
 /**
  * A single code concept extracted from the codebase.
@@ -70,6 +73,7 @@ export type SupportedLanguage =
   | "typescript"
   | "javascript"
   | "python"
+  | "markdown"
   | "unknown";
 
 // ─── Scanner Configuration ────────────────────────────────────────────
@@ -133,6 +137,7 @@ export const DEFAULT_INCLUDE_PATTERNS: string[] = [
   "**/*.js",
   "**/*.jsx",
   "**/*.py",
+  "**/*.md",
 ];
 
 // ─── Scan Results ─────────────────────────────────────────────────────

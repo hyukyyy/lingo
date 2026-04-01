@@ -17,7 +17,7 @@
     "lingo": {
       "command": "npx",
       "args": [
-        "@lingo/mcp-server"
+        "@hyukyyy/lingo-mcp-server"
       ],
       "env": {
         "LINGO_GLOSSARY_PATH": ".lingo/glossary.json",

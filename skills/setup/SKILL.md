@@ -5,7 +5,7 @@ description: "Configure tokens and initialize lingo for first use"
 
 # /lingo:setup
 
-Configure GitHub/Notion tokens and initialize lingo for a project.
+Configure adapter tokens and initialize lingo for a project.
 
 ## Usage
 
@@ -21,36 +21,80 @@ When the user invokes this skill:
 
 Use ToolSearch to load lingo MCP tools:
 ```
-ToolSearch query: "+lingo bootstrap"
+ToolSearch query: "+lingo bootstrap list_adapters"
 ```
 
-### Step 2: Gather Configuration
+### Step 2: Discover Available Adapters
 
-Ask the user for configuration via AskUserQuestion:
+Call `list_adapters` to get the current PM and SCM adapters registered with Lingo:
 
-**Question 1 — GitHub Token:**
+```
+Tool: list_adapters
+Input: {}
+```
+
+This returns a list of `{ name, type, displayName }` entries. For example:
+```json
+[
+  { "name": "notion", "type": "pm", "displayName": "Notion" },
+  { "name": "json", "type": "pm", "displayName": "JSON File" },
+  { "name": "github", "type": "scm", "displayName": "GitHub" }
+]
+```
+
+Separate the results into PM adapters (`type === "pm"`) and SCM adapters (`type === "scm"`).
+
+### Step 3: Generate Dynamic Setup Questions
+
+Using the adapter list from Step 2, generate configuration questions dynamically.
+
+**Question 1 — SCM Adapter Selection (if any SCM adapters available):**
+
+Build options from the SCM adapters returned by `list_adapters`:
+
 ```json
 {
-  "question": "GitHub Personal Access Token을 입력해주세요. PR 기반 학습에 필요합니다. (repo 권한 필요)",
-  "header": "GitHub",
+  "question": "어떤 SCM(소스 관리) 도구를 연동할까요? PR 기반 학습에 필요합니다.",
+  "header": "SCM 연동",
   "options": [
-    {"label": "직접 입력", "description": "PAT를 직접 입력합니다"},
-    {"label": "나중에 설정", "description": "GitHub 연동 없이 진행합니다"}
+    // One option per SCM adapter from list_adapters
+    // e.g. {"label": "GitHub", "description": "GitHub 저장소와 연동합니다 (PAT 필요, repo 권한)"},
+    // e.g. {"label": "GitLab", "description": "GitLab 저장소와 연동합니다"},
+    {"label": "나중에 설정", "description": "SCM 연동 없이 진행합니다"}
   ]
 }
 ```
 
-If "직접 입력", ask for the token text.
-
-**Question 2 — Notion Token (Optional):**
+If the user selects an SCM adapter, ask for the token:
 ```json
 {
-  "question": "Notion API Token을 설정할까요? (기획 아이템 연동용)",
-  "header": "Notion",
+  "question": "<displayName> 토큰을 입력해주세요.",
+  "header": "<displayName> Token"
+}
+```
+
+**Question 2 — PM Adapter Selection (if any PM adapters available):**
+
+Build options from the PM adapters returned by `list_adapters`:
+
+```json
+{
+  "question": "기획 도구(PM)를 연동할까요? (기획 아이템 연동용)",
+  "header": "PM 연동",
   "options": [
-    {"label": "직접 입력", "description": "Notion Integration Token을 입력합니다"},
-    {"label": "건너뛰기", "description": "Notion 연동 없이 진행합니다"}
+    // One option per PM adapter from list_adapters
+    // e.g. {"label": "Notion", "description": "Notion 워크스페이스와 연동합니다"},
+    // e.g. {"label": "JSON File", "description": "로컬 JSON 파일에서 기획 아이템을 읽습니다"},
+    {"label": "건너뛰기", "description": "PM 연동 없이 진행합니다"}
   ]
+}
+```
+
+If the user selects a PM adapter that requires a token (e.g., Notion), ask for the token:
+```json
+{
+  "question": "<displayName> API Token을 입력해주세요.",
+  "header": "<displayName> Token"
 }
 ```
 
@@ -66,36 +110,38 @@ If "직접 입력", ask for the token text.
 }
 ```
 
-### Step 3: Save Configuration
+### Step 4: Save Configuration
 
-Write `.lingo/config.json` using the Write tool:
+Write `.lingo/config.json` using the Write tool. Include only the adapters the user selected:
 
 ```json
 {
-  "github": {
+  "scm": {
+    "adapter": "<selected-scm-adapter-name or null>",
     "token": "<user-provided or empty>",
     "defaultRepo": "owner/repo"
   },
-  "notion": {
+  "pm": {
+    "adapter": "<selected-pm-adapter-name or null>",
     "token": "<user-provided or empty>",
-    "databaseIds": []
+    "config": {}
   },
   "repoPath": "<target-repo-path>"
 }
 ```
 
 Also set environment variables for the current session if tokens were provided:
-- `LINGO_GITHUB_TOKEN` for GitHub
-- Notion token in adapter config
+- `LINGO_GITHUB_TOKEN` for GitHub SCM adapter
+- Adapter-specific tokens as needed (e.g., Notion token in adapter config)
 
-### Step 4: Verify Connection
+### Step 5: Verify Connection
 
-If GitHub token was provided, verify it works:
+If an SCM token was provided, verify it works. For GitHub:
 ```bash
 curl -s -H "Authorization: Bearer <token>" https://api.github.com/user | head -5
 ```
 
-### Step 5: Suggest Next Steps
+### Step 6: Suggest Next Steps
 
 ```
 Setup complete!
@@ -104,3 +150,9 @@ Setup complete!
   /lingo:bootstrap — 코드베이스를 스캔하여 초기 글로서리를 생성합니다
   /lingo:learn <PR-URL> — PR에서 기획 용어를 학습합니다
 ```
+
+### Edge Cases
+
+- **No adapters available:** If `list_adapters` returns an empty list, inform the user that no adapters are registered and suggest running with default settings.
+- **list_adapters fails:** Fall back to asking about GitHub (SCM) and Notion (PM) as defaults — these are the built-in adapters.
+- **New adapter added at runtime:** Since `list_adapters` is called each time `/lingo:setup` runs, newly registered adapters will appear automatically without any SKILL.md changes.

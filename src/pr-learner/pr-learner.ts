@@ -7,6 +7,7 @@
 
 import type { CodeLocation, CodeRelationship } from "../models/glossary.js";
 import type { JsonGlossaryStorage } from "../storage/json-store.js";
+import type { SCMAdapter } from "../adapters/scm/types.js";
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -47,6 +48,15 @@ export interface LearnOptions {
   prUrl: string;
   githubToken?: string;
   dryRun?: boolean;
+  /**
+   * Optional SCM adapter instance. When provided, uses the adapter to fetch PR
+   * data instead of direct GitHub API calls. This enables support for any SCM
+   * provider (GitHub, GitLab, etc.) through the adapter abstraction.
+   *
+   * When omitted, falls back to the built-in direct GitHub API calls
+   * (`parsePRUrl` + `fetchPR`), preserving backward compatibility.
+   */
+  scmAdapter?: SCMAdapter;
 }
 
 // ─── GitHub API ─────────────────────────────────────────────────────
@@ -231,21 +241,31 @@ function inferRelationship(file: PRFileChange): string {
 /**
  * Learn organizational terminology from a GitHub PR.
  *
- * 1. Fetches PR info from GitHub API
+ * 1. Fetches PR info from GitHub API (via SCM adapter or direct calls)
  * 2. Extracts planning terms from title/description
  * 3. Maps changed files to code locations
  * 4. Creates or updates glossary terms
+ *
+ * When `options.scmAdapter` is provided, delegates PR fetching to the adapter.
+ * Otherwise, falls back to the built-in direct GitHub API calls for backward
+ * compatibility.
  */
 export async function learnFromPR(
   storage: JsonGlossaryStorage,
   options: LearnOptions,
 ): Promise<LearnResult> {
-  const { owner, repo, prNumber } = parsePRUrl(options.prUrl);
+  // Fetch PR info: adapter path vs. direct-call fallback
+  let pr: PRInfo;
 
-  // Resolve token: explicit > env > config file
-  const token = options.githubToken ?? process.env.LINGO_GITHUB_TOKEN ?? undefined;
-
-  const pr = await fetchPR(owner, repo, prNumber, token);
+  if (options.scmAdapter) {
+    // Use the SCM adapter — supports any provider (GitHub, GitLab, etc.)
+    pr = await options.scmAdapter.fetchPullRequestByUrl(options.prUrl);
+  } else {
+    // Fallback: direct GitHub API calls (backward compatible)
+    const { owner, repo, prNumber } = parsePRUrl(options.prUrl);
+    const token = options.githubToken ?? process.env.LINGO_GITHUB_TOKEN ?? undefined;
+    pr = await fetchPR(owner, repo, prNumber, token);
+  }
   const extractedTerms = extractTermsFromPR(pr);
   const codeLocations = extractCodeLocations(pr.changedFiles);
 

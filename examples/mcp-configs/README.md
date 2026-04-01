@@ -8,10 +8,10 @@ Configure your AI development tool to connect to the Lingo MCP server.
 
 ```bash
 # Automatic setup (recommended)
-claude mcp add lingo -- npx @lingo/mcp-server
+claude mcp add lingo -- npx @hyukyyy/lingo-mcp-server
 
 # With custom glossary path
-claude mcp add lingo -e LINGO_GLOSSARY_PATH=.lingo/glossary.json -e LINGO_ORG=my-org -- npx @lingo/mcp-server
+claude mcp add lingo -e LINGO_GLOSSARY_PATH=.lingo/glossary.json -e LINGO_ORG=my-org -- npx @hyukyyy/lingo-mcp-server
 
 # Verify it's registered
 claude mcp list
@@ -26,7 +26,7 @@ Create or edit `.mcp.json` in your project root:
   "mcpServers": {
     "lingo": {
       "command": "npx",
-      "args": ["@lingo/mcp-server"],
+      "args": ["@hyukyyy/lingo-mcp-server"],
       "env": {
         "LINGO_GLOSSARY_PATH": ".lingo/glossary.json",
         "LINGO_ORG": "my-org"
@@ -47,7 +47,7 @@ Create or edit `.cursor/mcp.json` in your project root:
   "mcpServers": {
     "lingo": {
       "command": "npx",
-      "args": ["@lingo/mcp-server"],
+      "args": ["@hyukyyy/lingo-mcp-server"],
       "env": {
         "LINGO_GLOSSARY_PATH": ".lingo/glossary.json",
         "LINGO_ORG": "my-org"
@@ -60,7 +60,7 @@ Create or edit `.cursor/mcp.json` in your project root:
 Or use **Cursor Settings > MCP Servers > Add Server** and enter:
 - **Name:** `lingo`
 - **Command:** `npx`
-- **Args:** `@lingo/mcp-server`
+- **Args:** `@hyukyyy/lingo-mcp-server`
 
 ### Claude Desktop
 
@@ -74,7 +74,7 @@ Add to your Claude Desktop config file:
   "mcpServers": {
     "lingo": {
       "command": "npx",
-      "args": ["@lingo/mcp-server"],
+      "args": ["@hyukyyy/lingo-mcp-server"],
       "env": {
         "LINGO_GLOSSARY_PATH": ".lingo/glossary.json",
         "LINGO_ORG": "my-org"
@@ -107,7 +107,7 @@ Add to your Claude Desktop config file:
 ### Via npx (recommended for end users)
 
 ```json
-{ "command": "npx", "args": ["@lingo/mcp-server"] }
+{ "command": "npx", "args": ["@hyukyyy/lingo-mcp-server"] }
 ```
 
 Best for: Published package usage. npx resolves the latest installed version.
@@ -131,7 +131,7 @@ Best for: Running the compiled JavaScript directly without npx overhead.
 ### Via global install
 
 ```bash
-npm install -g @lingo/mcp-server
+npm install -g @hyukyyy/lingo-mcp-server
 ```
 
 ```json
@@ -156,8 +156,8 @@ Then test with a simple query:
 
 **Server not starting?**
 - Ensure Node.js >= 18 is installed: `node --version`
-- Ensure the package is available: `npx @lingo/mcp-server --help`
-- Check stderr logs: `LINGO_LOG_LEVEL=debug npx @lingo/mcp-server`
+- Ensure the package is available: `npx @hyukyyy/lingo-mcp-server --help`
+- Check stderr logs: `LINGO_LOG_LEVEL=debug npx @hyukyyy/lingo-mcp-server`
 
 **No tools showing up?**
 - Verify the server name is `lingo` in your config (case-sensitive)

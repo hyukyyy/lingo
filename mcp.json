@@ -2,12 +2,12 @@
   "$schema": "https://raw.githubusercontent.com/modelcontextprotocol/specification/main/schema/mcp.schema.json",
   "server": {
     "name": "lingo",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "description": "Organizational context layer for AI development tools — maps planning terminology to code locations, enabling AI tools to understand your organization's unique language and workflows.",
     "homepage": "https://github.com/dyoon/lingo",
     "command": "npx",
     "args": [
-      "@lingo/mcp-server"
+      "@hyukyyy/lingo-mcp-server"
     ],
     "transport": "stdio",
     "env": {
@@ -65,6 +65,9 @@
       },
       "record_signal": {
         "description": "Record a coupling signal for a glossary term to strengthen its term↔code mapping score"
+      },
+      "list_adapters": {
+        "description": "List all available PM and SCM adapters with name, type, and displayName"
       }
     },
     "resources": {

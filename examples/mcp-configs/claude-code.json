@@ -7,7 +7,7 @@
     "  Option B (global):        Merge into ~/.claude/mcp.json",
     "",
     "Quick setup via CLI:",
-    "  claude mcp add lingo -- npx @lingo/mcp-server",
+    "  claude mcp add lingo -- npx @hyukyyy/lingo-mcp-server",
     "",
     "Environment variables (all optional):",
     "  LINGO_GLOSSARY_PATH  Path to glossary JSON file (default: .lingo/glossary.json)",
@@ -18,7 +18,7 @@
     "lingo": {
       "command": "npx",
       "args": [
-        "@lingo/mcp-server"
+        "@hyukyyy/lingo-mcp-server"
       ],
       "env": {
         "LINGO_GLOSSARY_PATH": ".lingo/glossary.json",

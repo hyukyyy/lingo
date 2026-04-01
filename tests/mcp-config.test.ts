@@ -88,9 +88,9 @@ describe("mcp.json server manifest", () => {
       expect(manifest.server.command).toBe("npx");
     });
 
-    it("points to @lingo/mcp-server package", () => {
+    it("points to @hyukyyy/lingo-mcp-server package", () => {
       const manifest = loadMcpManifest();
-      expect(manifest.server.args).toContain("@lingo/mcp-server");
+      expect(manifest.server.args).toContain("@hyukyyy/lingo-mcp-server");
     });
 
     it("uses stdio transport", () => {
@@ -249,14 +249,14 @@ describe("client setup configs", () => {
       expect(claudeDesktop.mcpServers.lingo.command).toBe("npx");
     });
 
-    it("all production configs point to @lingo/mcp-server", () => {
+    it("all production configs point to @hyukyyy/lingo-mcp-server", () => {
       const claudeCode = loadClientConfig("claude-code");
       const cursor = loadClientConfig("cursor");
       const claudeDesktop = loadClientConfig("claude-desktop");
 
-      expect(claudeCode.mcpServers.lingo.args).toContain("@lingo/mcp-server");
-      expect(cursor.mcpServers.lingo.args).toContain("@lingo/mcp-server");
-      expect(claudeDesktop.mcpServers.lingo.args).toContain("@lingo/mcp-server");
+      expect(claudeCode.mcpServers.lingo.args).toContain("@hyukyyy/lingo-mcp-server");
+      expect(cursor.mcpServers.lingo.args).toContain("@hyukyyy/lingo-mcp-server");
+      expect(claudeDesktop.mcpServers.lingo.args).toContain("@hyukyyy/lingo-mcp-server");
     });
 
     it("local-dev config uses tsx for hot-reload", () => {
