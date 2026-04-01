@@ -1,0 +1,29 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "lingo",
+  "description": "Organizational context layer — maps planning terminology to code locations for AI development tools",
+  "owner": {
+    "name": "hyukyyy"
+  },
+  "plugins": [
+    {
+      "name": "lingo",
+      "description": "Maps planning terminology to code locations for AI development tools",
+      "version": "0.1.1",
+      "author": {
+        "name": "hyukyyy"
+      },
+      "source": "./",
+      "category": "development",
+      "homepage": "https://github.com/hyukyyy/lingo",
+      "repository": "https://github.com/hyukyyy/lingo",
+      "license": "MIT",
+      "keywords": [
+        "mcp",
+        "glossary",
+        "terminology",
+        "code-mapping"
+      ]
+    }
+  ]
+}
