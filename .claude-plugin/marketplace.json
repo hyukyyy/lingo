@@ -1,7 +1,5 @@
 {
-  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "lingo",
-  "description": "Organizational context layer — maps planning terminology to code locations for AI development tools",
   "owner": {
     "name": "hyukyyy"
   },

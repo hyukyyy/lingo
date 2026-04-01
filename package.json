@@ -8,6 +8,7 @@
   "files": [
     "dist/",
     "hooks/",
+    "skills/",
     "examples/",
     "mcp.json",
     "README.md",
