@@ -2,5 +2,5 @@ node_modules/
 dist/
 *.tsbuildinfo
 docs/
-.lingo/config.json
+.lingo/
 tests/**/.tmp-test-data/
