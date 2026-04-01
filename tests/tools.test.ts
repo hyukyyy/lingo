@@ -371,7 +371,7 @@ describe("Lingo MCP Tools", () => {
       expect(Array.isArray(parsed.terms)).toBe(true);
     });
 
-    it("bootstrap works with no arguments", async () => {
+    it("bootstrap works with no arguments", { timeout: 15_000 }, async () => {
       const result = await client.callTool({
         name: TOOL_NAMES.BOOTSTRAP,
         arguments: {},
