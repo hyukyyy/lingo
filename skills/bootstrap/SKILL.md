@@ -26,11 +26,16 @@ When the user invokes this skill:
 ToolSearch query: "+lingo bootstrap"
 ```
 
-### Step 2: Check Prerequisites
+### Step 2: Check Prerequisites & Read Config
 
-Check if `.lingo/config.json` exists. If not, suggest running `/lingo:setup` first.
+1. Read `.mcp.json` to find the current `LINGO_GLOSSARY_PATH`. Extract the parent directory as the configured target repo path.
+   - e.g. if `LINGO_GLOSSARY_PATH` is `/home/user/my-project/.lingo/glossary.json`, the target repo is `/home/user/my-project`
+   - If `LINGO_GLOSSARY_PATH` is a relative path like `.lingo/glossary.json`, the target repo is the current working directory
+2. Check if `<repoPath>/.lingo/config.json` exists. If not, suggest running `/lingo:setup` first.
 
 ### Step 3: Gather Parameters
+
+Use the target repo path from Step 2 as the default scan directory.
 
 Ask via AskUserQuestion:
 
@@ -39,7 +44,7 @@ Ask via AskUserQuestion:
   "question": "어떤 디렉토리를 스캔할까요?",
   "header": "Scan",
   "options": [
-    {"label": "현재 디렉토리", "description": "현재 작업 디렉토리를 스캔합니다"},
+    {"label": "<repoPath from Step 2>", "description": "설정된 대상 저장소를 스캔합니다"},
     {"label": "직접 입력", "description": "다른 경로를 지정합니다"}
   ]
 }

@@ -19,9 +19,10 @@
  *   - list_adapters:         List all available PM and SCM adapters with { name, type, displayName }
  */
 
+import { join } from "node:path";
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { JsonGlossaryStorage } from "../storage/json-store.js";
+import { JsonGlossaryStorage } from "../storage/json-store.js";
 import type {
   GlossaryTerm,
   CodeRelationship,
@@ -930,13 +931,21 @@ export function registerTools(
     },
     async (args) => {
       try {
+        const rootDir = args.rootDir ?? process.cwd();
+
+        // Use rootDir-local glossary storage so the glossary is written
+        // next to the scanned codebase, not next to the MCP server.
+        const targetStorage = args.rootDir
+          ? new JsonGlossaryStorage(join(rootDir, ".lingo", "glossary.json"))
+          : storage;
+
         const orchestrator = new BootstrapOrchestrator({
-          storage,
+          storage: targetStorage,
           adapterRegistry: options?.adapterRegistry,
         });
 
         const summary = await orchestrator.run({
-          rootDir: args.rootDir ?? process.cwd(),
+          rootDir,
           adapterName: args.adapter,
           adapterOptions: {
             projectId: args.projectId,

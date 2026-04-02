@@ -112,7 +112,7 @@ If the user selects a PM adapter that requires a token (e.g., Notion), ask for t
 
 ### Step 4: Save Configuration
 
-Write `.lingo/config.json` using the Write tool. Include only the adapters the user selected:
+Write `<repoPath>/.lingo/config.json` using the Write tool (create the `.lingo/` directory if needed). Include only the adapters the user selected:
 
 ```json
 {
@@ -133,6 +133,31 @@ Write `.lingo/config.json` using the Write tool. Include only the adapters the u
 Also set environment variables for the current session if tokens were provided:
 - `LINGO_GITHUB_TOKEN` for GitHub SCM adapter
 - Adapter-specific tokens as needed (e.g., Notion token in adapter config)
+
+### Step 4.5: Update MCP Glossary Path
+
+The MCP server stores the glossary at the path specified by `LINGO_GLOSSARY_PATH` in `.mcp.json`. This must point to the target repo, not the lingo project directory.
+
+1. Read the project's `.mcp.json` file
+2. Update `LINGO_GLOSSARY_PATH` to `<repoPath>/.lingo/glossary.json` (use the absolute path from Step 3)
+3. Write the updated `.mcp.json` using Edit
+
+Example — if the user selected `/home/user/my-project`:
+```json
+{
+  "mcpServers": {
+    "lingo": {
+      "env": {
+        "LINGO_GLOSSARY_PATH": "/home/user/my-project/.lingo/glossary.json"
+      }
+    }
+  }
+}
+```
+
+4. Inform the user: "`.mcp.json`이 업데이트되었습니다. MCP 서버 재연결을 위해 Claude Code를 재시작해주세요."
+
+**Note:** If `repoPath` is the current working directory (same as cwd in `.mcp.json`), the relative path `.lingo/glossary.json` is sufficient and no update is needed.
 
 ### Step 5: Verify Connection
 
