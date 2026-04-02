@@ -267,7 +267,8 @@ const isDirectExecution =
   process.argv[1] &&
   (process.argv[1].endsWith("/server.js") ||
     process.argv[1].endsWith("/server.ts") ||
-    process.argv[1].endsWith("dist/server.js"));
+    process.argv[1].endsWith("dist/server.js") ||
+    process.argv[1].endsWith("/lingo"));
 
 if (isDirectExecution) {
   main();
