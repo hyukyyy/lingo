@@ -1432,6 +1432,29 @@ export function registerTools(
         .optional()
         .default(false)
         .describe("Preview extracted terms without saving to glossary"),
+      prData: z
+        .object({
+          number: z.number(),
+          title: z.string(),
+          body: z.string(),
+          url: z.string(),
+          mergedAt: z.string().nullable(),
+          labels: z.array(z.string()),
+          changedFiles: z.array(
+            z.object({
+              filename: z.string(),
+              status: z.enum(["added", "modified", "removed", "renamed"]),
+              additions: z.number(),
+              deletions: z.number(),
+              patch: z.string().optional(),
+            })
+          ),
+        })
+        .optional()
+        .describe(
+          "Pre-fetched PR data (from an external GitHub MCP server). " +
+          "When provided, skips internal GitHub API calls."
+        ),
     },
     async (args) => {
       try {
@@ -1450,6 +1473,7 @@ export function registerTools(
           prUrl: args.prUrl,
           githubToken: args.githubToken,
           dryRun: args.dryRun,
+          prData: args.prData,
           scmAdapter,
         });
 

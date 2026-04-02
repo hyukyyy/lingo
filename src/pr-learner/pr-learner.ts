@@ -49,6 +49,11 @@ export interface LearnOptions {
   githubToken?: string;
   dryRun?: boolean;
   /**
+   * Pre-fetched PR data (e.g., from an external GitHub MCP server).
+   * When provided, skips all fetch operations and uses this data directly.
+   */
+  prData?: PRInfo;
+  /**
    * Optional SCM adapter instance. When provided, uses the adapter to fetch PR
    * data instead of direct GitHub API calls. This enables support for any SCM
    * provider (GitHub, GitLab, etc.) through the adapter abstraction.
@@ -254,10 +259,13 @@ export async function learnFromPR(
   storage: JsonGlossaryStorage,
   options: LearnOptions,
 ): Promise<LearnResult> {
-  // Fetch PR info: adapter path vs. direct-call fallback
+  // Fetch PR info: prData → scmAdapter → direct API (priority chain)
   let pr: PRInfo;
 
-  if (options.scmAdapter) {
+  if (options.prData) {
+    // Pre-fetched data (e.g., from external GitHub MCP server)
+    pr = options.prData;
+  } else if (options.scmAdapter) {
     // Use the SCM adapter — supports any provider (GitHub, GitLab, etc.)
     pr = await options.scmAdapter.fetchPullRequestByUrl(options.prUrl);
   } else {

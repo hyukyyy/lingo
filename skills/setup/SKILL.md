@@ -46,6 +46,23 @@ This returns a list of `{ name, type, displayName }` entries. For example:
 
 Separate the results into PM adapters (`type === "pm"`) and SCM adapters (`type === "scm"`).
 
+### Step 2.5: Detect External MCP Servers
+
+Check if external GitHub or Notion MCP servers are already connected:
+
+```
+ToolSearch query: "github pull request" max_results: 3
+ToolSearch query: "notion database" max_results: 3
+```
+
+Record the results:
+- `githubMcpAvailable`: true if GitHub MCP tools found
+- `notionMcpAvailable`: true if Notion MCP tools found
+
+If any external MCP is detected, inform the user:
+- GitHub MCP 발견: "GitHub MCP 서버가 이미 연결되어 있습니다. /lingo:learn과 /lingo:bootstrap에서 GitHub MCP를 통해 PR 데이터를 가져옵니다. GITHUB_TOKEN 설정은 선택사항(backup)입니다."
+- Notion MCP 발견: "Notion MCP 서버가 이미 연결되어 있습니다. /lingo:bootstrap에서 Notion MCP를 통해 데이터베이스를 읽습니다. NOTION_API_TOKEN 설정은 선택사항(backup)입니다."
+
 ### Step 3: Generate Dynamic Setup Questions
 
 Using the adapter list from Step 2, generate configuration questions dynamically.
@@ -67,12 +84,16 @@ Build options from the SCM adapters returned by `list_adapters`:
 }
 ```
 
-If the user selects an SCM adapter, ask for the token using AskUserQuestion:
+If the user selects an SCM adapter, ask for the token using AskUserQuestion.
+**If `githubMcpAvailable` is true**, add a note that the token is optional since GitHub MCP is already connected:
+
 ```json
 {
   "question": "<displayName> 토큰을 어떻게 설정할까요?",
   "header": "<displayName> Token",
   "options": [
+    // githubMcpAvailable이면 이 옵션을 첫 번째로:
+    {"label": "GitHub MCP 사용", "description": "이미 연결된 GitHub MCP를 사용합니다 (토큰 불필요)"},
     {"label": "직접 입력", "description": "여기에 PAT를 직접 입력합니다"},
     {"label": "나중에 설정", "description": "SCM 연동 없이 진행하고, 나중에 .lingo/config.json에 토큰을 추가합니다"},
     {"label": "환경변수명 지정", "description": "사용할 환경변수명을 알려주시면 config에 참조로 저장합니다"}
@@ -97,12 +118,16 @@ Build options from the PM adapters returned by `list_adapters`:
 }
 ```
 
-If the user selects a PM adapter that requires a token (e.g., Notion), ask for the token using AskUserQuestion:
+If the user selects a PM adapter that requires a token (e.g., Notion), ask for the token using AskUserQuestion.
+**If `notionMcpAvailable` is true**, add a note that the token is optional since Notion MCP is already connected:
+
 ```json
 {
   "question": "<displayName> 토큰을 어떻게 설정할까요?",
   "header": "<displayName> Token",
   "options": [
+    // notionMcpAvailable이면 이 옵션을 첫 번째로:
+    {"label": "Notion MCP 사용", "description": "이미 연결된 Notion MCP를 사용합니다 (토큰 불필요)"},
     {"label": "직접 입력", "description": "여기에 API Token을 직접 입력합니다"},
     {"label": "나중에 설정", "description": "PM 연동 없이 진행하고, 나중에 .lingo/config.json에 토큰을 추가합니다"},
     {"label": "환경변수명 지정", "description": "사용할 환경변수명을 알려주시면 config에 참조로 저장합니다"}
