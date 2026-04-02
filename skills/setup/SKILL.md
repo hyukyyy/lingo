@@ -15,6 +15,8 @@ Configure adapter tokens and initialize lingo for a project.
 
 ## Instructions
 
+**IMPORTANT: 사용자에게 질문하거나 선택지를 제시할 때는 반드시 AskUserQuestion 도구를 사용하세요. 일반 텍스트로 질문하지 마세요.**
+
 When the user invokes this skill:
 
 ### Step 1: Load MCP Tools
@@ -65,11 +67,16 @@ Build options from the SCM adapters returned by `list_adapters`:
 }
 ```
 
-If the user selects an SCM adapter, ask for the token:
+If the user selects an SCM adapter, ask for the token using AskUserQuestion:
 ```json
 {
-  "question": "<displayName> 토큰을 입력해주세요.",
-  "header": "<displayName> Token"
+  "question": "<displayName> 토큰을 어떻게 설정할까요?",
+  "header": "<displayName> Token",
+  "options": [
+    {"label": "직접 입력", "description": "여기에 PAT를 직접 입력합니다"},
+    {"label": "나중에 설정", "description": "SCM 연동 없이 진행하고, 나중에 .lingo/config.json에 토큰을 추가합니다"},
+    {"label": "환경변수명 지정", "description": "사용할 환경변수명을 알려주시면 config에 참조로 저장합니다"}
+  ]
 }
 ```
 
@@ -90,11 +97,16 @@ Build options from the PM adapters returned by `list_adapters`:
 }
 ```
 
-If the user selects a PM adapter that requires a token (e.g., Notion), ask for the token:
+If the user selects a PM adapter that requires a token (e.g., Notion), ask for the token using AskUserQuestion:
 ```json
 {
-  "question": "<displayName> API Token을 입력해주세요.",
-  "header": "<displayName> Token"
+  "question": "<displayName> 토큰을 어떻게 설정할까요?",
+  "header": "<displayName> Token",
+  "options": [
+    {"label": "직접 입력", "description": "여기에 API Token을 직접 입력합니다"},
+    {"label": "나중에 설정", "description": "PM 연동 없이 진행하고, 나중에 .lingo/config.json에 토큰을 추가합니다"},
+    {"label": "환경변수명 지정", "description": "사용할 환경변수명을 알려주시면 config에 참조로 저장합니다"}
+  ]
 }
 ```
 

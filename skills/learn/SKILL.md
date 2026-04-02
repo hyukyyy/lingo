@@ -19,6 +19,8 @@ Learn organizational terminology from a merged GitHub Pull Request.
 
 ## Instructions
 
+**IMPORTANT: 사용자에게 질문하거나 선택지를 제시할 때는 반드시 AskUserQuestion 도구를 사용하세요. 일반 텍스트로 질문하지 마세요.**
+
 When the user invokes this skill:
 
 ### Step 1: Load MCP Tools
