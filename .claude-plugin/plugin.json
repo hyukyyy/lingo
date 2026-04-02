@@ -1,6 +1,6 @@
 {
   "name": "lingo",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Organizational context layer — maps planning terminology to code locations for AI tools",
   "author": {
     "name": "hyukyyy"
