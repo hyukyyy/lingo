@@ -228,12 +228,11 @@ export class BootstrapOrchestrator {
           termSource = "codebase-inferred";
         }
       } else {
-        warnings.push(
-          `PM adapter "${options.adapterName}" not found in registry. ` +
-          "Falling back to codebase-inferred terminology."
+        throw new Error(
+          `PM adapter "${options.adapterName}" is not available. ` +
+          "Ensure the adapter token is configured (env var or /lingo:setup), " +
+          "or omit the adapter parameter to scan codebase only."
         );
-        terms = this.inferTermsFromCode(scanResult.concepts);
-        termSource = "codebase-inferred";
       }
     } else {
       terms = this.inferTermsFromCode(scanResult.concepts);

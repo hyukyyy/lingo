@@ -227,6 +227,11 @@ export interface RegisterToolsOptions {
   adapterRegistry?: AdapterRegistry;
   /** Optional SCM adapter registry for learn_from_pr and list_adapters tools */
   scmAdapterRegistry?: SCMAdapterRegistry;
+  /** Adapter tokens from environment variables */
+  adapterTokens?: {
+    github?: string;
+    notion?: string;
+  };
 }
 
 /**
@@ -938,6 +943,35 @@ export function registerTools(
         const targetStorage = args.rootDir
           ? new JsonGlossaryStorage(join(rootDir, ".lingo", "glossary.json"))
           : storage;
+
+        // If an adapter is requested, ensure it's instantiated with env token
+        if (args.adapter && options?.adapterRegistry) {
+          const registry = options.adapterRegistry;
+          if (!registry.get(args.adapter) && registry.hasFactory(args.adapter)) {
+            const tokenMap: Record<string, string | undefined> = {
+              notion: options.adapterTokens?.notion,
+              github: options.adapterTokens?.github,
+            };
+            const token = tokenMap[args.adapter];
+            if (!token) {
+              const envVarMap: Record<string, string> = {
+                notion: "NOTION_API_TOKEN",
+                github: "GITHUB_TOKEN",
+              };
+              const envVar = envVarMap[args.adapter] ?? `${args.adapter.toUpperCase()}_TOKEN`;
+              throw new Error(
+                `Adapter "${args.adapter}" requires a token but none was found. ` +
+                `Set the ${envVar} environment variable and restart the MCP server.`
+              );
+            }
+            registry.getOrCreate(args.adapter, { apiToken: token, databaseIds: [] });
+          } else if (!registry.get(args.adapter) && !registry.hasFactory(args.adapter)) {
+            throw new Error(
+              `Adapter "${args.adapter}" is not registered. ` +
+              `Available adapters: ${registry.getAll().map((a: { name?: string }) => a.name ?? "unknown").join(", ") || "none"}`
+            );
+          }
+        }
 
         const orchestrator = new BootstrapOrchestrator({
           storage: targetStorage,

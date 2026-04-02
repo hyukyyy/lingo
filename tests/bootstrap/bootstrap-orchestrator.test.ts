@@ -309,7 +309,7 @@ describe("BootstrapOrchestrator", () => {
       expect(mockAdapter.extract).toHaveBeenCalled();
     });
 
-    it("should fall back to codebase-inferred when adapter is not found", async () => {
+    it("should throw error when adapter is not found", async () => {
       const orchestrator = new BootstrapOrchestrator({
         scanner,
         mappingEngine,
@@ -317,16 +317,12 @@ describe("BootstrapOrchestrator", () => {
         adapterRegistry,
       });
 
-      const summary = await orchestrator.run({
-        rootDir: "/test/project",
-        adapterName: "nonexistent-adapter",
-      });
-
-      // Should fall back to code inference
-      expect(summary.termSource).toBe("codebase-inferred");
-      expect(summary.warnings).toContainEqual(
-        expect.stringContaining("not found in registry"),
-      );
+      await expect(
+        orchestrator.run({
+          rootDir: "/test/project",
+          adapterName: "nonexistent-adapter",
+        }),
+      ).rejects.toThrow("not available");
     });
 
     it("should fall back to codebase-inferred when adapter returns no terms", async () => {

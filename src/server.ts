@@ -59,6 +59,11 @@ export interface LingoServerConfig {
   organization: string;
   /** Logging level */
   logLevel: LogLevel;
+  /** Adapter tokens from environment variables */
+  adapterTokens: {
+    github?: string;
+    notion?: string;
+  };
 }
 
 /**
@@ -71,6 +76,10 @@ export function loadConfig(): LingoServerConfig {
     glossaryPath: process.env.LINGO_GLOSSARY_PATH ?? ".lingo/glossary.json",
     organization: process.env.LINGO_ORG ?? "default",
     logLevel: LOG_LEVELS[logLevel] !== undefined ? logLevel : "info",
+    adapterTokens: {
+      github: process.env.GITHUB_TOKEN,
+      notion: process.env.NOTION_API_TOKEN,
+    },
   };
 }
 
@@ -165,6 +174,7 @@ export function createServer(
   registerTools(server, resolvedStorage, {
     adapterRegistry,
     scmAdapterRegistry,
+    adapterTokens: config.adapterTokens,
   });
 
   // Register all resource handlers
