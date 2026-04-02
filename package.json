@@ -11,6 +11,7 @@
     "skills/",
     "examples/",
     "mcp.json",
+    ".mcp.json",
     "README.md",
     ".claude-plugin/",
     "CHANGELOG.md"

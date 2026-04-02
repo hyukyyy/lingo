@@ -4,3 +4,4 @@ dist/
 docs/
 .lingo/
 tests/**/.tmp-test-data/
+.mcp.dev.json

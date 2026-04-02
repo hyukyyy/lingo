@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "lingo": {
+      "command": "npx",
+      "args": ["@hyukyyy/lingo-mcp-server"]
+    }
+  }
+}
