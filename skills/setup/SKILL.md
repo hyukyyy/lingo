@@ -203,6 +203,36 @@ If an SCM token was provided, verify it works. For GitHub:
 curl -s -H "Authorization: Bearer <token>" https://api.github.com/user | head -5
 ```
 
+### Step 5.5: Configure Automatic Context Hook
+
+Register the UserPromptSubmit hook so that lingo glossary context is automatically injected into every prompt.
+
+1. Determine the lingo hooks directory path:
+   - If running via plugin: use the plugin's hooks directory path
+   - Find by checking: `ls ~/.claude/plugins/cache/*/lingo/*/hooks/user-prompt-hook.sh 2>/dev/null` or locate the installed plugin path
+   - Fallback: use the `LINGO_HOOKS_PATH` env var if set
+
+2. Read the project's `.claude/settings.json` (create if it doesn't exist)
+
+3. Add the UserPromptSubmit hook configuration. Merge with existing hooks if present:
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "type": "command",
+        "command": "bash <hooks-path>/user-prompt-hook.sh"
+      }
+    ]
+  }
+}
+```
+
+4. The hook also needs `LINGO_GLOSSARY_PATH` to find the glossary. If this env var is set in `.mcp.json`, inform the user that the same path will be used by the hook. If the glossary is at the default location (`.lingo/glossary.json` relative to the project), no extra configuration is needed.
+
+5. Inform the user: "자동 컨텍스트 hook이 등록되었습니다. 이제 프롬프트를 입력할 때마다 관련 글로서리 용어가 자동으로 참조됩니다."
+
 ### Step 6: Suggest Next Steps
 
 ```
@@ -211,6 +241,9 @@ Setup complete!
 📍 Next steps:
   /lingo:bootstrap — 코드베이스를 스캔하여 초기 글로서리를 생성합니다
   /lingo:learn <PR-URL> — PR에서 기획 용어를 학습합니다
+
+✅ 자동 컨텍스트가 활성화되었습니다.
+   프롬프트에서 글로서리 용어를 언급하면 자동으로 정의와 코드 위치가 표시됩니다.
 ```
 
 ### Edge Cases
