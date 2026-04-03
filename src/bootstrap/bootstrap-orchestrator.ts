@@ -71,6 +71,19 @@ export interface BootstrapOptions {
    * Organization name for the glossary store (used if store is newly created).
    */
   organization?: string;
+
+  /**
+   * Progress callback invoked at each major step of the bootstrap operation.
+   * Useful for logging or UI progress reporting.
+   */
+  onProgress?: (step: string, detail: string) => void;
+
+  /**
+   * Timeout in milliseconds for the adapter extraction step.
+   * If the adapter takes longer than this, extraction is aborted.
+   * Default: 60000 (60 seconds).
+   */
+  adapterTimeoutMs?: number;
 }
 
 /**
@@ -180,9 +193,13 @@ export class BootstrapOrchestrator {
   async run(options: BootstrapOptions): Promise<BootstrapSummary> {
     const startTime = performance.now();
     const warnings: string[] = [];
+    const progress = options.onProgress ?? (() => {});
+    const adapterTimeout = options.adapterTimeoutMs ?? 60_000;
 
     // ── Step 1: Scan the codebase ──────────────────────────────────
+    progress("scan-start", `Scanning codebase at ${options.rootDir}...`);
     const scanResult = await this.scanCodebase(options);
+    progress("scan-done", `Scan complete: ${scanResult.stats.filesParsed} files, ${scanResult.concepts.length} concepts (${(scanResult.stats.durationMs / 1000).toFixed(1)}s)`);
 
     if (scanResult.concepts.length === 0) {
       warnings.push("No code concepts found — check that the root directory contains source files.");
@@ -201,9 +218,13 @@ export class BootstrapOrchestrator {
     let extractionStats: BootstrapSummary["extraction"] | undefined;
 
     if (options.adapterName) {
-      const extractionResult = await this.extractFromAdapter(
+      progress("extract-start", `Extracting terms from adapter "${options.adapterName}"...`);
+
+      const extractionResult = await this.extractFromAdapterWithTimeout(
         options.adapterName,
         options.adapterOptions,
+        adapterTimeout,
+        progress,
       );
 
       if (extractionResult) {
@@ -214,6 +235,7 @@ export class BootstrapOrchestrator {
           termsExtracted: extractionResult.stats.termsProduced,
           durationMs: extractionResult.stats.durationMs,
         };
+        progress("extract-done", `Extraction complete: ${extractionResult.stats.itemsFetched} items → ${extractionResult.stats.termsProduced} terms (${(extractionResult.stats.durationMs / 1000).toFixed(1)}s)`);
 
         for (const w of extractionResult.warnings) {
           warnings.push(`[adapter:${options.adapterName}] ${w}`);
@@ -224,6 +246,7 @@ export class BootstrapOrchestrator {
             `PM adapter "${options.adapterName}" returned no terms. ` +
             "Falling back to codebase-inferred terminology."
           );
+          progress("extract-fallback", "Adapter returned no terms, falling back to codebase inference");
           terms = this.inferTermsFromCode(scanResult.concepts);
           termSource = "codebase-inferred";
         }
@@ -235,7 +258,9 @@ export class BootstrapOrchestrator {
         );
       }
     } else {
+      progress("infer-start", "Inferring terms from code concepts...");
       terms = this.inferTermsFromCode(scanResult.concepts);
+      progress("infer-done", `Inferred ${terms.length} terms from code`);
       termSource = "codebase-inferred";
     }
 
@@ -244,16 +269,33 @@ export class BootstrapOrchestrator {
     }
 
     // ── Step 3: Generate mappings ──────────────────────────────────
-    const mappingResult = this.mappingEngine.generateMappings(
+    progress("mapping-start", `Generating mappings for ${terms.length} terms against ${scanResult.concepts.length} concepts...`);
+
+    // Create a mapping engine with progress reporting if callback is provided
+    const mappingEngine = options.onProgress
+      ? new MappingEngine({
+          ...options.mappingConfig,
+          onProgress: (p) => {
+            progress(
+              "mapping-progress",
+              `Mapping: ${p.termsProcessed}/${p.totalTerms} terms (${(p.elapsedMs / 1000).toFixed(1)}s)`,
+            );
+          },
+        })
+      : this.mappingEngine;
+
+    const mappingResult = await mappingEngine.generateMappingsAsync(
       terms,
       scanResult.concepts,
     );
+    progress("mapping-done", `Mappings complete: ${mappingResult.stats.candidatesAfterFilter} candidates above threshold`);
 
     // ── Step 4: Persist to glossary ────────────────────────────────
     const persistedTerms: GlossaryTerm[] = [];
     const termPreviews: BootstrapTermPreview[] = [];
 
     if (!options.dryRun && terms.length > 0) {
+      progress("persist-start", `Persisting ${terms.length} terms to glossary...`);
       // Ensure the store is loaded
       await this.storage.load(options.organization ?? "default");
 
@@ -288,6 +330,7 @@ export class BootstrapOrchestrator {
           id: glossaryTerm.id,
         });
       }
+      progress("persist-done", `Persisted ${persistedTerms.length} terms`);
     } else {
       // Dry run — build previews without persisting
       for (const term of terms) {
@@ -373,6 +416,40 @@ export class BootstrapOrchestrator {
       maxItems: adapterOptions?.maxItems,
       project: adapterOptions?.projectId,
     });
+  }
+
+  /**
+   * Extract terminology from a PM adapter with a timeout guard.
+   * Returns null if the adapter is not registered.
+   * Throws if the adapter takes longer than the timeout.
+   */
+  private async extractFromAdapterWithTimeout(
+    adapterName: string,
+    adapterOptions: BootstrapOptions["adapterOptions"],
+    timeoutMs: number,
+    progress: (step: string, detail: string) => void,
+  ): Promise<ExtractionResult | null> {
+    const adapter = this.adapterRegistry.get(adapterName);
+    if (!adapter) {
+      return null;
+    }
+
+    const extractionPromise = adapter.extract({
+      maxItems: adapterOptions?.maxItems,
+      project: adapterOptions?.projectId,
+    });
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        progress("extract-timeout", `Adapter "${adapterName}" timed out after ${timeoutMs / 1000}s`);
+        reject(new Error(
+          `Adapter "${adapterName}" timed out after ${timeoutMs / 1000}s. ` +
+          "The external service may be unreachable. Check your token and network connection."
+        ));
+      }, timeoutMs);
+    });
+
+    return Promise.race([extractionPromise, timeoutPromise]);
   }
 
   // ─── Private: Cold-Start Term Inference ─────────────────────────

@@ -22,6 +22,8 @@
  *   console.log(result.mappings); // Ranked candidate mappings
  */
 
+import { availableParallelism } from "node:os";
+import { Worker } from "node:worker_threads";
 import type { CodeConcept, CodeConceptKind } from "../types/index.js";
 import type { NormalizedTerm } from "../adapters/types.js";
 import type { CodeRelationship } from "../models/glossary.js";
@@ -33,6 +35,17 @@ import {
   computePartialTokenOverlap,
   normalizeForComparison,
 } from "./tokenizer.js";
+import { InvertedIndex } from "./inverted-index.js";
+import type { TermTokens, ConceptTokens, ConceptTokenCache } from "./inverted-index.js";
+import {
+  computeScore as computeScorePure,
+  scoreExactMatch as scoreExactMatchPure,
+  scoreAliasExactMatch as scoreAliasExactMatchPure,
+  STRATEGY_WEIGHTS as STRATEGY_WEIGHTS_IMPORTED,
+  KIND_BONUS as KIND_BONUS_IMPORTED,
+  KIND_TO_RELATIONSHIP as KIND_TO_RELATIONSHIP_IMPORTED,
+  EXPORT_BONUS as EXPORT_BONUS_IMPORTED,
+} from "./scoring.js";
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -78,6 +91,18 @@ export interface MappingCandidate {
 }
 
 /**
+ * Progress update emitted during mapping.
+ */
+export interface MappingProgress {
+  /** Number of terms processed so far */
+  termsProcessed: number;
+  /** Total number of terms to process */
+  totalTerms: number;
+  /** Elapsed time in milliseconds */
+  elapsedMs: number;
+}
+
+/**
  * Configuration for the mapping engine.
  */
 export interface MappingConfig {
@@ -89,6 +114,9 @@ export interface MappingConfig {
 
   /** Which strategies to use (default: all) */
   strategies?: MatchStrategy[];
+
+  /** Optional progress callback, invoked periodically during mapping */
+  onProgress?: (progress: MappingProgress) => void;
 }
 
 /**
@@ -122,7 +150,7 @@ export interface MappingResult {
   stats: MappingStats;
 }
 
-// ─── Constants ──────────────────────────────────────────────────────
+// ─── Constants (imported from scoring.ts) ───────────────────────────
 
 /** Default minimum confidence threshold */
 const DEFAULT_MIN_CONFIDENCE = 0.10;
@@ -130,60 +158,11 @@ const DEFAULT_MIN_CONFIDENCE = 0.10;
 /** Default max candidates per term */
 const DEFAULT_MAX_CANDIDATES_PER_TERM = 5;
 
-/**
- * Strategy weights — how much each strategy contributes to the final score.
- * Primary strategies (exact, token) carry most weight.
- * Secondary strategies (file-path, description) provide supplementary signal.
- * When all strategies fire at full strength, the raw total can exceed 1.0
- * before the kind-adjustment and clamping step.
- */
-const STRATEGY_WEIGHTS: Record<MatchStrategy, number> = {
-  "exact":         0.55,
-  "alias-exact":   0.50,
-  "token-overlap": 0.35,
-  "file-path":     0.20,
-  "description":   0.20,
-  "alias-token":   0.20,
-};
-
-/**
- * Bonus multiplier for concept kind — more "defining" kinds score higher.
- * These represent how likely a concept kind is to be the primary definition
- * of a PM term.
- */
-const KIND_BONUS: Record<CodeConceptKind, number> = {
-  class:      1.00,
-  interface:  0.95,
-  module:     0.85,
-  enum:       0.80,
-  namespace:  0.75,
-  function:   0.70,
-  constant:   0.60,
-  directory:  0.50,
-  section:    0.40,
-  term:       0.45,
-  definition: 0.45,
-};
-
-/**
- * Map concept kind to the suggested code relationship type.
- */
-const KIND_TO_RELATIONSHIP: Record<CodeConceptKind, CodeRelationship> = {
-  class:      "defines",
-  interface:  "defines",
-  module:     "defines",
-  enum:       "defines",
-  namespace:  "defines",
-  function:   "implements",
-  constant:   "configures",
-  directory:  "defines",
-  section:    "defines",
-  term:       "defines",
-  definition: "defines",
-};
-
-/** Bonus for exported concepts (more likely to be public API / primary definition) */
-const EXPORT_BONUS = 0.05;
+// Re-alias imported constants for backward compatibility within this file
+const STRATEGY_WEIGHTS = STRATEGY_WEIGHTS_IMPORTED;
+const KIND_BONUS = KIND_BONUS_IMPORTED;
+const KIND_TO_RELATIONSHIP = KIND_TO_RELATIONSHIP_IMPORTED;
+const EXPORT_BONUS = EXPORT_BONUS_IMPORTED;
 
 // ─── Engine ─────────────────────────────────────────────────────────
 
@@ -197,6 +176,7 @@ export class MappingEngine {
   private readonly minConfidence: number;
   private readonly maxCandidatesPerTerm: number;
   private readonly enabledStrategies: Set<MatchStrategy>;
+  private readonly onProgress?: (progress: MappingProgress) => void;
 
   constructor(config?: MappingConfig) {
     this.minConfidence = config?.minConfidence ?? DEFAULT_MIN_CONFIDENCE;
@@ -205,6 +185,7 @@ export class MappingEngine {
     this.enabledStrategies = new Set(
       config?.strategies ?? (Object.keys(STRATEGY_WEIGHTS) as MatchStrategy[])
     );
+    this.onProgress = config?.onProgress;
   }
 
   /**
@@ -226,12 +207,41 @@ export class MappingEngine {
     // Pre-compute tokenized representations for all concepts (avoid re-tokenizing per term)
     const conceptTokenCache = this.buildConceptTokenCache(concepts);
 
+    // Build inverted index for candidate pre-filtering
+    const invertedIndex = new InvertedIndex();
+    invertedIndex.build(
+      concepts.map((c) => c.id),
+      conceptTokenCache,
+    );
+
+    // Build a concept lookup map for fast ID → concept resolution
+    const conceptMap = new Map(concepts.map((c) => [c.id, c]));
+
     let totalCandidates = 0;
     const allMappings: MappingCandidate[] = [];
 
-    for (const term of terms) {
+    // Progress reporting: emit every 100 terms or 5% of total, whichever is smaller
+    const progressInterval = Math.max(1, Math.min(100, Math.floor(terms.length * 0.05)));
+
+    for (let i = 0; i < terms.length; i++) {
+      const term = terms[i];
       const termTokens = this.tokenizeTerm(term);
-      const candidates = this.scoreTerm(term, termTokens, concepts, conceptTokenCache);
+
+      // Use inverted index to pre-filter candidate concepts
+      const candidateIds = invertedIndex.getCandidates(termTokens);
+      let candidateConcepts: CodeConcept[];
+      if (candidateIds.size > 0) {
+        candidateConcepts = [];
+        for (const id of candidateIds) {
+          const concept = conceptMap.get(id);
+          if (concept) candidateConcepts.push(concept);
+        }
+      } else {
+        // Fallback: no tokens → scan all concepts
+        candidateConcepts = concepts;
+      }
+
+      const candidates = this.scoreTerm(term, termTokens, candidateConcepts, conceptTokenCache);
       totalCandidates += candidates.length;
 
       // Filter by confidence threshold
@@ -242,6 +252,24 @@ export class MappingEngine {
       const topN = filtered.slice(0, this.maxCandidatesPerTerm);
 
       allMappings.push(...topN);
+
+      // Emit progress
+      if (this.onProgress && (i + 1) % progressInterval === 0) {
+        this.onProgress({
+          termsProcessed: i + 1,
+          totalTerms: terms.length,
+          elapsedMs: performance.now() - startTime,
+        });
+      }
+    }
+
+    // Final progress notification
+    if (this.onProgress) {
+      this.onProgress({
+        termsProcessed: terms.length,
+        totalTerms: terms.length,
+        elapsedMs: performance.now() - startTime,
+      });
     }
 
     const durationMs = performance.now() - startTime;
@@ -317,156 +345,15 @@ export class MappingEngine {
 
   /**
    * Compute the raw score for a term-concept pair using all enabled strategies.
+   * Delegates to the pure scoring functions in scoring.ts.
    */
   private computeScore(
-    term: NormalizedTerm,
+    _term: NormalizedTerm,
     termTokens: TermTokens,
-    concept: CodeConcept,
+    _concept: CodeConcept,
     conceptTokens: ConceptTokens
   ): { score: number; strategies: MatchStrategy[] } {
-    let score = 0;
-    const strategies: MatchStrategy[] = [];
-
-    // Strategy 1: Exact name match
-    if (this.enabledStrategies.has("exact")) {
-      const exactScore = this.scoreExactMatch(
-        termTokens.normalizedName,
-        conceptTokens.normalizedName
-      );
-      if (exactScore > 0) {
-        score += exactScore * STRATEGY_WEIGHTS["exact"];
-        strategies.push("exact");
-      }
-    }
-
-    // Strategy 2: Alias exact match
-    if (this.enabledStrategies.has("alias-exact")) {
-      const aliasScore = this.scoreAliasExactMatch(
-        termTokens.normalizedAliases,
-        conceptTokens.normalizedName
-      );
-      if (aliasScore > 0) {
-        score += aliasScore * STRATEGY_WEIGHTS["alias-exact"];
-        strategies.push("alias-exact");
-      }
-    }
-
-    // Strategy 3: Token overlap (term name tokens vs concept name tokens)
-    // Uses partial/prefix matching to handle cases like "auth" ↔ "authentication"
-    if (this.enabledStrategies.has("token-overlap")) {
-      const tokenScore = computePartialTokenOverlap(
-        termTokens.nameTokens,
-        conceptTokens.nameTokens
-      );
-      if (tokenScore > 0) {
-        score += tokenScore * STRATEGY_WEIGHTS["token-overlap"];
-        strategies.push("token-overlap");
-      }
-    }
-
-    // Strategy 4: File path match
-    // Uses partial matching — term "billing" should match path token "billing"
-    if (this.enabledStrategies.has("file-path")) {
-      const pathScore = computePartialTokenOverlap(
-        termTokens.nameTokens,
-        conceptTokens.pathTokens
-      );
-      if (pathScore > 0) {
-        score += pathScore * STRATEGY_WEIGHTS["file-path"];
-        strategies.push("file-path");
-      }
-    }
-
-    // Strategy 5: Description/definition match
-    // Uses partial matching for natural language overlap
-    if (this.enabledStrategies.has("description")) {
-      const descScore = computePartialTokenOverlap(
-        termTokens.definitionTokens,
-        conceptTokens.descriptionTokens
-      );
-      if (descScore > 0) {
-        score += descScore * STRATEGY_WEIGHTS["description"];
-        strategies.push("description");
-      }
-    }
-
-    // Strategy 6: Alias token overlap
-    if (this.enabledStrategies.has("alias-token")) {
-      let bestAliasTokenScore = 0;
-      for (const aliasTokens of termTokens.aliasTokenSets) {
-        const aliasScore = computePartialTokenOverlap(
-          aliasTokens,
-          conceptTokens.nameTokens
-        );
-        if (aliasScore > bestAliasTokenScore) {
-          bestAliasTokenScore = aliasScore;
-        }
-      }
-      if (bestAliasTokenScore > 0) {
-        score += bestAliasTokenScore * STRATEGY_WEIGHTS["alias-token"];
-        strategies.push("alias-token");
-      }
-    }
-
-    return { score, strategies };
-  }
-
-  /**
-   * Score exact name match. Returns 1.0 for exact match, 0.0 otherwise.
-   * Comparison is done on normalized forms (lowered, separators converted to spaces).
-   * Also checks compact form (all separators removed) to catch camelCase vs space-separated.
-   */
-  private scoreExactMatch(
-    normalizedTermName: string,
-    normalizedConceptName: string
-  ): number {
-    if (!normalizedTermName || !normalizedConceptName) return 0;
-
-    // Exact match (after normalization — spaces, underscores, dashes all become spaces)
-    if (normalizedTermName === normalizedConceptName) return 1.0;
-
-    // Compact form: remove all spaces to compare "auth service" vs "authservice"
-    const termCompact = normalizedTermName.replace(/\s/g, "");
-    const conceptCompact = normalizedConceptName.replace(/\s/g, "");
-    if (termCompact === conceptCompact) return 0.95;
-
-    // Check if one contains the other (substring) for shorter terms
-    if (termCompact.length >= 3 && conceptCompact.length >= 3) {
-      if (conceptCompact.includes(termCompact)) {
-        return 0.6 * (termCompact.length / conceptCompact.length);
-      }
-      if (termCompact.includes(conceptCompact)) {
-        return 0.6 * (conceptCompact.length / termCompact.length);
-      }
-    }
-
-    return 0;
-  }
-
-  /**
-   * Score alias exact matches. Returns the best alias match score.
-   */
-  private scoreAliasExactMatch(
-    normalizedAliases: string[],
-    normalizedConceptName: string
-  ): number {
-    if (!normalizedConceptName) return 0;
-
-    let bestScore = 0;
-
-    for (const alias of normalizedAliases) {
-      if (alias === normalizedConceptName) {
-        bestScore = Math.max(bestScore, 1.0);
-      } else {
-        const aliasCompact = alias.replace(/\s/g, "");
-        const conceptCompact = normalizedConceptName.replace(/\s/g, "");
-        if (aliasCompact === conceptCompact) {
-          bestScore = Math.max(bestScore, 0.9);
-        }
-      }
-    }
-
-    return bestScore;
+    return computeScorePure(termTokens, conceptTokens, this.enabledStrategies);
   }
 
   // ─── Private: Token Caching ───────────────────────────────────────
@@ -503,26 +390,181 @@ export class MappingEngine {
 
     return cache;
   }
+
+  // ─── Async Parallel Mapping ─────────────────────────────────────
+
+  /**
+   * Async version of generateMappings that uses worker threads for
+   * parallel term scoring. Falls back to single-threaded execution
+   * if workers fail or for small inputs.
+   */
+  async generateMappingsAsync(
+    terms: NormalizedTerm[],
+    concepts: CodeConcept[],
+  ): Promise<MappingResult> {
+    // For small inputs, skip worker overhead
+    if (terms.length < 500 || concepts.length < 1000) {
+      return this.generateMappings(terms, concepts);
+    }
+
+    const startTime = performance.now();
+
+    try {
+      return await this.runWithWorkers(terms, concepts, startTime);
+    } catch (err) {
+      // Graceful fallback to single-threaded
+      process.stderr.write(
+        `[lingo:mapping] Worker threads failed (${(err as Error).message}), falling back to single-threaded\n`,
+      );
+      return this.generateMappings(terms, concepts);
+    }
+  }
+
+  private async runWithWorkers(
+    terms: NormalizedTerm[],
+    concepts: CodeConcept[],
+    startTime: number,
+  ): Promise<MappingResult> {
+    // Build shared data structures
+    const conceptTokenCache = this.buildConceptTokenCache(concepts);
+    const invertedIndex = new InvertedIndex();
+    invertedIndex.build(
+      concepts.map((c) => c.id),
+      conceptTokenCache,
+    );
+
+    // Serialize for worker transfer
+    const serializedConcepts = concepts.map((c) => ({
+      id: c.id,
+      name: c.name,
+      kind: c.kind,
+      filePath: c.filePath,
+      exported: c.exported,
+    }));
+
+    const serializedCache: [string, ConceptTokens][] = [];
+    for (const [id, tokens] of conceptTokenCache) {
+      serializedCache.push([id, tokens]);
+    }
+
+    const serializedIndex = invertedIndex.serialize();
+
+    const config = {
+      minConfidence: this.minConfidence,
+      maxCandidatesPerTerm: this.maxCandidatesPerTerm,
+      enabledStrategies: Array.from(this.enabledStrategies),
+    };
+
+    // Split terms into chunks for workers
+    const workerCount = Math.min(
+      Math.max(1, availableParallelism() - 1),
+      8,
+      Math.ceil(terms.length / 100), // At least 100 terms per worker
+    );
+
+    const chunkSize = Math.ceil(terms.length / workerCount);
+    const chunks: NormalizedTerm[][] = [];
+    for (let i = 0; i < terms.length; i += chunkSize) {
+      chunks.push(terms.slice(i, i + chunkSize));
+    }
+
+    // Resolve worker script path (ESM-compatible)
+    const workerUrl = new URL("./mapping-worker.js", import.meta.url);
+
+    // Track aggregated progress
+    let totalTermsProcessed = 0;
+    const workerTermsProcessed = new Array(chunks.length).fill(0);
+
+    // Spawn workers
+    const workerPromises = chunks.map((chunk, workerIndex) => {
+      return new Promise<{ mappings: MappingCandidate[]; totalCandidates: number }>(
+        (resolve, reject) => {
+          const worker = new Worker(workerUrl, {
+            workerData: {
+              terms: chunk,
+              concepts: serializedConcepts,
+              conceptTokenCache: serializedCache,
+              invertedIndex: serializedIndex,
+              config,
+            },
+          });
+
+          // Per-worker timeout (5 minutes)
+          const timeout = setTimeout(() => {
+            worker.terminate();
+            reject(new Error(`Worker ${workerIndex} timed out after 5 minutes`));
+          }, 5 * 60 * 1000);
+
+          worker.on("message", (msg: { type: string; termsProcessed?: number; mappings?: MappingCandidate[]; totalCandidates?: number }) => {
+            if (msg.type === "progress" && msg.termsProcessed !== undefined) {
+              workerTermsProcessed[workerIndex] = msg.termsProcessed;
+              const newTotal = workerTermsProcessed.reduce((a, b) => a + b, 0);
+              if (this.onProgress && newTotal > totalTermsProcessed) {
+                totalTermsProcessed = newTotal;
+                this.onProgress({
+                  termsProcessed: totalTermsProcessed,
+                  totalTerms: terms.length,
+                  elapsedMs: performance.now() - startTime,
+                });
+              }
+            } else if (msg.type === "result") {
+              clearTimeout(timeout);
+              resolve({
+                mappings: msg.mappings ?? [],
+                totalCandidates: msg.totalCandidates ?? 0,
+              });
+            }
+          });
+
+          worker.on("error", (err) => {
+            clearTimeout(timeout);
+            reject(err);
+          });
+
+          worker.on("exit", (code) => {
+            clearTimeout(timeout);
+            if (code !== 0) {
+              reject(new Error(`Worker ${workerIndex} exited with code ${code}`));
+            }
+          });
+        },
+      );
+    });
+
+    // Wait for all workers
+    const results = await Promise.all(workerPromises);
+
+    // Merge results
+    const allMappings: MappingCandidate[] = [];
+    let totalCandidates = 0;
+
+    for (const result of results) {
+      allMappings.push(...result.mappings);
+      totalCandidates += result.totalCandidates;
+    }
+
+    const durationMs = performance.now() - startTime;
+
+    // Final progress
+    if (this.onProgress) {
+      this.onProgress({
+        termsProcessed: terms.length,
+        totalTerms: terms.length,
+        elapsedMs: durationMs,
+      });
+    }
+
+    return {
+      mappings: allMappings,
+      stats: {
+        termsProcessed: terms.length,
+        conceptsAnalyzed: concepts.length,
+        candidatesGenerated: totalCandidates,
+        candidatesAfterFilter: allMappings.length,
+        durationMs,
+      },
+    };
+  }
 }
 
-// ─── Internal Types ─────────────────────────────────────────────────
-
-/** Pre-tokenized representation of a PM term */
-interface TermTokens {
-  normalizedName: string;
-  normalizedAliases: string[];
-  nameTokens: string[];
-  definitionTokens: string[];
-  aliasTokenSets: string[][];
-}
-
-/** Pre-tokenized representation of a code concept */
-interface ConceptTokens {
-  normalizedName: string;
-  nameTokens: string[];
-  pathTokens: string[];
-  descriptionTokens: string[];
-}
-
-/** Lookup from concept ID → pre-tokenized data */
-type ConceptTokenCache = Map<string, ConceptTokens>;
+// Types TermTokens, ConceptTokens, ConceptTokenCache are imported from inverted-index.ts

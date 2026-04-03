@@ -9,6 +9,7 @@ export {
   MappingEngine,
   type MappingCandidate,
   type MappingConfig,
+  type MappingProgress,
   type MappingResult,
   type MappingStats,
   type MatchStrategy,
@@ -23,3 +24,11 @@ export {
   computePartialTokenOverlap,
   normalizeForComparison,
 } from "./tokenizer.js";
+
+export {
+  InvertedIndex,
+  type TermTokens,
+  type ConceptTokens,
+  type ConceptTokenCache,
+  type SerializedInvertedIndex,
+} from "./inverted-index.js";

@@ -978,6 +978,10 @@ export function registerTools(
           adapterRegistry: options?.adapterRegistry,
         });
 
+        const onProgress = (_step: string, detail: string) => {
+          process.stderr.write(`[lingo:bootstrap] ${detail}\n`);
+        };
+
         const summary = await orchestrator.run({
           rootDir,
           adapterName: args.adapter,
@@ -987,6 +991,7 @@ export function registerTools(
           },
           dryRun: args.dryRun ?? false,
           organization: args.organization,
+          onProgress,
         });
 
         return {
