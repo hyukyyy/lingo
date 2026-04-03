@@ -252,6 +252,38 @@ export async function startServer(
   await server.connect(transport);
   logger.info("Server connected via stdio transport");
 
+  // After connection, try to resolve the correct glossary path using MCP client roots.
+  // When running as a Claude Code plugin, the server's CWD is the plugin install directory,
+  // not the user's project. The MCP client provides workspace roots we can use instead.
+  if (!resolvedConfig.glossaryPath.startsWith("/")) {
+    try {
+      const result = await server.server.listRoots();
+      if (result.roots.length > 0) {
+        const rootUri = result.roots[0].uri;
+        // MCP roots use file:// URIs
+        const rootPath = rootUri.startsWith("file://")
+          ? decodeURIComponent(new URL(rootUri).pathname)
+          : rootUri;
+        const correctPath = rootPath.endsWith("/")
+          ? rootPath + resolvedConfig.glossaryPath
+          : rootPath + "/" + resolvedConfig.glossaryPath;
+        if (correctPath !== storage.getFilePath()) {
+          logger.info(
+            `Project root detected: ${rootPath} — reloading glossary from ${correctPath}`
+          );
+          await storage.reinitialize(
+            correctPath,
+            resolvedConfig.organization
+          );
+        }
+      }
+    } catch {
+      logger.debug(
+        "Could not get client roots, using default glossary path"
+      );
+    }
+  }
+
   return { server, cleanup };
 }
 

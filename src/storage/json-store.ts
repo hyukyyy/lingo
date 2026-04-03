@@ -57,7 +57,7 @@ export type StorageErrorCode =
  */
 export class JsonGlossaryStorage {
   private store: GlossaryStore | null = null;
-  private readonly filePath: string;
+  private filePath: string;
 
   constructor(filePath: string) {
     this.filePath = resolve(filePath);
@@ -102,6 +102,20 @@ export class JsonGlossaryStorage {
 
     this.store = validateStore(parsed);
     return this.store;
+  }
+
+  /**
+   * Re-initializes storage from a new file path.
+   * Resets the in-memory store and reloads from the new location.
+   * Used when the correct project root is discovered after initial load.
+   */
+  async reinitialize(
+    newPath: string,
+    organization = "default"
+  ): Promise<GlossaryStore> {
+    this.filePath = resolve(newPath);
+    this.store = null;
+    return this.load(organization);
   }
 
   /**
