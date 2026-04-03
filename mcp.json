@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/modelcontextprotocol/specification/main/schema/mcp.schema.json",
   "server": {
     "name": "lingo",
-    "version": "0.1.4",
+    "version": "0.1.5",
     "description": "Organizational context layer for AI development tools — maps planning terminology to code locations, enabling AI tools to understand your organization's unique language and workflows.",
     "homepage": "https://github.com/dyoon/lingo",
     "command": "npx",

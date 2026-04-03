@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-04-03
+
+### Added
+
+- **UserPromptSubmit hook** — automatic glossary context injection on every prompt
+  - `hooks/user-prompt-hook.sh`: reads glossary, matches terms against prompt, outputs definitions + code locations
+  - Korean/CJK character boundary support (handles "module도" style adjacent text)
+  - Coupling score-based ranking, max 10 terms per prompt
+  - Setup skill registers hook automatically (Step 5.5)
+- **Mapping engine optimization — Inverted Index**
+  - `src/mapping/inverted-index.ts`: token→concept reverse index with prefix binary search
+  - Reduces comparison space from 434M pairs to ~40M (90%+ reduction)
+  - Prefix matching support (e.g., "auth" finds "authentication")
+  - Serialization/deserialization for worker thread transfer
+- **Mapping engine optimization — Worker Threads**
+  - `src/mapping/scoring.ts`: extracted pure scoring functions for worker sharing
+  - `src/mapping/mapping-worker.ts`: worker thread script for parallel scoring
+  - `generateMappingsAsync()`: multi-core parallel mapping with automatic fallback
+  - Small input optimization: skips workers for < 500 terms or < 1000 concepts
+- **Mapping progress reporting**
+  - `MappingProgress` callback in `MappingConfig.onProgress`
+  - Reports N/M terms processed at 5% intervals during mapping
+- **Bootstrap progress logging**
+  - `BootstrapOptions.onProgress` callback at each major step
+  - `BootstrapOptions.adapterTimeoutMs` — 60s timeout for adapter extraction
+  - stderr output: scan/extract/map/persist step durations
+
+### Changed
+
+- `bootstrap-orchestrator.ts`: uses `generateMappingsAsync()` for parallel mapping
+- `mapping-engine.ts`: scoring logic delegated to `scoring.ts`, inverted index pre-filtering
+- Setup skill: added hook registration step (Step 5.5)
+
 ## [0.1.4] - 2026-04-02
 
 ### Added
@@ -72,7 +105,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Example configurations and skill definitions
 - Vitest test suite
 
-[Unreleased]: https://github.com/hyukyyy/lingo/compare/v0.1.4...HEAD
+[Unreleased]: https://github.com/hyukyyy/lingo/compare/v0.1.5...HEAD
+[0.1.5]: https://github.com/hyukyyy/lingo/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/hyukyyy/lingo/compare/v0.1.1...v0.1.4
 [0.1.1]: https://github.com/hyukyyy/lingo/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/hyukyyy/lingo/releases/tag/v0.1.0
